@@ -1,0 +1,102 @@
+:root {
+  --bg-color: #5414eb;
+  --toolbar-bg: #2d2d2d;
+  --text-color: #ffffff;
+  --button-bg: #404040;
+  --button-hover: #505050;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  overflow: hidden;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+#toolbar {
+  background-color: var(--toolbar-bg);
+  padding: 10px;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toolbar-section {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.execution-button {
+  font-family: monospace;
+  min-width: 80px;
+}
+
+.execution-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#nodeTypeSelect {
+  background-color: var(--button-bg);
+  color: var(--text-color);
+  border: none;
+  padding: 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  min-width: 150px;
+}
+
+#nodeTypeSelect:hover {
+  background-color: var(--button-hover);
+}
+
+#nodeTypeSelect optgroup {
+  background-color: var(--toolbar-bg);
+}
+
+#nodeTypeSelect option {
+  background-color: var(--button-bg);
+  padding: 4px;
+}
+
+button {
+  background-color: var(--button-bg);
+  color: var(--text-color);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+button:hover {
+  background-color: var(--button-hover);
+}
+
+.tools {
+  margin-left: 20px;
+  display: flex;
+  gap: 20px;
+  font-size: 14px;
+  color: #888;
+}
+
+#nodeCanvas {
+  flex: 1;
+  background-color: var(--bg-color);
+  width: 100%;
+  height: calc(100vh - 50px);
+  display: block;
+}

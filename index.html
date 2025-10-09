@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Node Editor</title>
+    <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+    <div id="app">
+        <div id="toolbar">
+            <div class="toolbar-section">
+                <button id="addNode">Add Node (+)</button>
+                <button id="clearCanvas">Clear Canvas</button>
+            </div>
+            <div class="toolbar-section execution">
+                <button id="playButton" class="execution-button">▶ Play</button>
+                <button id="stopButton" class="execution-button" disabled>⬛ Stop</button>
+            </div>
+            <div class="toolbar-section node-types">
+                <select id="nodeTypeSelect">
+                    <option value="">Select Node Type...</option>
+                    <optgroup label="Input/Output">
+                        <option value="number">Number Input</option>
+                        <option value="boolean">Boolean Input</option>
+                        <option value="display">Display</option>
+                    </optgroup>
+                    <optgroup label="Logic">
+                        <option value="and">AND</option>
+                        <option value="or">OR</option>
+                        <option value="not">NOT</option>
+                    </optgroup>
+                    <optgroup label="Comparison">
+                        <option value="greater">Greater Than</option>
+                        <option value="equals">Equals</option>
+                    </optgroup>
+                </select>
+            </div>
+            <div class="tools">
+                <span>Tools:</span>
+                <span>Press 'A' to add node</span>
+                <span>Middle mouse to pan</span>
+                <span>Mouse wheel to zoom</span>
+                <span>Delete to remove selected</span>
+            </div>
+        </div>
+        <canvas id="nodeCanvas"></canvas>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drag and Drop Elastic Example with Optimized Easing</title>
+    <style>
+        body {
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            justify-content: left;
+            align-items: left;
+            background-color: #f0f0f0;
+        }
+        .draggable {
+          cursor: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24"><path fill="%23FFF" stroke="%23000" stroke-width="2" d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87a.5.5 0 0 0 .35-.85L6.35 2.85a.5.5 0 0 0-.85.35Z"></path></svg>');
+          position: absolute;
+          z-index: 1;
+        }
+        .dropin {
+        }
+    </style>
+</head>
+<body>
+  <div id="dad" class="daddy">
+    <div class="dropin dropout" style="background-color: blue; width: 300px; height: 500px;">
+     <div id="draggableDiv" class="draggable" style="background-color: gray; width: 100px; height: 100px;">
+      <svg class="dragAdm" width="24px" height="24px" fill="#000000" version="1.1" id="icon" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="256px" height="256px" viewBox="0 0 32.00 32.00" xml:space="preserve" transform="rotate(270)"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <style type="text/css"> .st0{fill:none;} </style> <title>draggable</title> <rect x="10" y="6" width="4" height="4"></rect> <rect x="18" y="6" width="4" height="4"></rect> <rect x="10" y="14" width="4" height="4"></rect> <rect x="18" y="14" width="4" height="4"></rect> <rect x="10" y="22" width="4" height="4"></rect> <rect x="18" y="22" width="4" height="4"></rect> <rect id="_Transparent_Rectangle_" class="st0" width="32" height="32"></rect> </g></svg>     
+     </div>
+     <div id="draggableDiv" class="draggable" style="background-color: gray; width: 100px; height: 100px;">
+      <svg class="dragAdm" width="24px" height="24px" fill="#000000" version="1.1" id="icon" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="256px" height="256px" viewBox="0 0 32.00 32.00" xml:space="preserve" transform="rotate(270)"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <style type="text/css"> .st0{fill:none;} </style> <title>draggable</title> <rect x="10" y="6" width="4" height="4"></rect> <rect x="18" y="6" width="4" height="4"></rect> <rect x="10" y="14" width="4" height="4"></rect> <rect x="18" y="14" width="4" height="4"></rect> <rect x="10" y="22" width="4" height="4"></rect> <rect x="18" y="22" width="4" height="4"></rect> <rect id="_Transparent_Rectangle_" class="st0" width="32" height="32"></rect> </g></svg>      
+     </div>
+     <div id="draggableDiv" class="draggable" style="background-color: gray; width: 100px; height: 100px;">
+      <svg class="dragAdm" width="24px" height="24px" fill="#000000" version="1.1" id="icon" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="256px" height="256px" viewBox="0 0 32.00 32.00" xml:space="preserve" transform="rotate(270)"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <style type="text/css"> .st0{fill:none;} </style> <title>draggable</title> <rect x="10" y="6" width="4" height="4"></rect> <rect x="18" y="6" width="4" height="4"></rect> <rect x="10" y="14" width="4" height="4"></rect> <rect x="18" y="14" width="4" height="4"></rect> <rect x="10" y="22" width="4" height="4"></rect> <rect x="18" y="22" width="4" height="4"></rect> <rect id="_Transparent_Rectangle_" class="st0" width="32" height="32"></rect> </g></svg>     
+     </div>
+     <div id="draggableDiv" class="draggable" style="background-color: gray; width: 100px; height: 100px;">
+      <svg class="dragAdm" width="24px" height="24px" fill="#000000" version="1.1" id="icon" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="256px" height="256px" viewBox="0 0 32.00 32.00" xml:space="preserve" transform="rotate(270)"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <style type="text/css"> .st0{fill:none;} </style> <title>draggable</title> <rect x="10" y="6" width="4" height="4"></rect> <rect x="18" y="6" width="4" height="4"></rect> <rect x="10" y="14" width="4" height="4"></rect> <rect x="18" y="14" width="4" height="4"></rect> <rect x="10" y="22" width="4" height="4"></rect> <rect x="18" y="22" width="4" height="4"></rect> <rect id="_Transparent_Rectangle_" class="st0" width="32" height="32"></rect> </g></svg>
+     </div>
+    </div>
+  </div>
+<script>
+    class Draggable {
+        constructor(element) {
+            this.element = element;
+            this.init();
+        }
+    
+        init() {
+            this.element.addEventListener('mousedown', this.onMouseDown.bind(this));
+            this.element.setAttribute('draggable', true);
+        }
+        
+        onDragStart(event) {
+            event.dataTransfer.setData('text/plain', this.element.id); // Guardar el ID del elemento
+        }
+      
+        onMouseDown(event) {
+            event.preventDefault(); // Evitar selección de texto
+    
+            const offsetX = event.clientX - this.element.getBoundingClientRect().left;
+            const offsetY = event.clientY - this.element.getBoundingClientRect().top;
+    
+            let lastX = event.clientX;
+            let lastY = event.clientY;
+    
+    
+    
+            const onMouseMove = (moveEvent) => {
+                const targetX = moveEvent.clientX - offsetX;
+                const targetY = moveEvent.clientY - offsetY;
+    
+                // Llamar a la función para animar el movimiento
+                this.animateMovement(targetX, targetY);
+                lastX = moveEvent.clientX;
+                lastY = moveEvent.clientY;
+    
+            };
+    
+            const onMouseUp = () => {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                
+                // Calcular la dirección y aplicar overshoot
+                const finalTargetX = lastX - offsetX;
+                const finalTargetY = lastY - offsetY;
+    
+                this.finalizeMovement(finalTargetX, finalTargetY);
+            };
+    
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+    
+        animateMovement(targetX, targetY) {
+            const { left: currentX, top: currentY } = this.element.getBoundingClientRect();
+            
+            // Definir la velocidad de movimiento
+            const speed = 0.5; 
+    
+            // Calcular la nueva posición usando interpolación lineal
+            const newX = currentX + (targetX - currentX) * speed;
+            const newY = currentY + (targetY - currentY) * speed;
+    
+            this.element.style.left = `${newX}px`;
+            this.element.style.top = `${newY}px`;
+    
+            }
+    
+        finalizeMovement(targetX, targetY) {
+            const overshootAmount = 300; // Cantidad de overshoot
+    
+            // Calcular la dirección del movimiento
+            const deltaX = targetX - (this.element.getBoundingClientRect().left + window.scrollX);
+            const deltaY = targetY - (this.element.getBoundingClientRect().top + window.scrollY);
+    
+            // Calcular la nueva posición con overshoot
+            const overshootTargetX = targetX + (deltaX > 0 ? overshootAmount : -overshootAmount);
+            const overshootTargetY = targetY + (deltaY > 0 ? overshootAmount : -overshootAmount);
+    
+            
+            // Animar hacia el overshoot y luego volver a la posición final
+            this.animateToFinalPosition(overshootTargetX, overshootTargetY, targetX, targetY);
+        }
+    
+        animateToFinalPosition(overshootTargetX, overshootTargetY, finalTargetX, finalTargetY) {
+            const { left: currentX, top: currentY } = this.element.getBoundingClientRect();
+            
+            let startTime;
+    
+            const animateStep = (timestamp) => {
+                if (!startTime) startTime = timestamp; // Inicializar el tiempo de inicio
+                const elapsedTime = timestamp - startTime;
+    
+                // Normalizar el tiempo entre 0 y 1
+                let t = Math.min(elapsedTime / 500, 1); // Duración total de 500 ms
+                t = this.easeInOutCubic(t); // Aplicar easing cúbico in-out
+    
+                // Calcular nueva posición hacia el overshoot
+                const newPosx = currentX + (overshootTargetX - currentX) * t;
+                const newPosy = currentY + (overshootTargetY - currentY) * t;
+    
+                this.element.style.left = `${newPosx}px`;
+                this.element.style.top = `${newPosy}px`;
+    
+                };
+    
+            requestAnimationFrame(animateStep);
+        }
+    
+        adjustToFinalPosition(finalTargetX, finalTargetY) {
+           let adjustSpeed = 0.1;
+    
+           const adjustPosition = () => {
+               const { left: currentX, top: currentY } = this.element.getBoundingClientRect();
+    
+               // Calcular nueva posición hacia el objetivo final con easing
+               let newPosx = this.ease(currentX + window.scrollX, finalTargetX, adjustSpeed);
+               let newPosy = this.ease(currentY + window.scrollY, finalTargetY, adjustSpeed);
+    
+               this.element.style.left = `${newPosx}px`;
+               this.element.style.top = `${newPosy}px`;
+    
+              
+               if (Math.abs(finalTargetX - newPosx) > 1 || Math.abs(finalTargetY - newPosy) > 1) {
+                   requestAnimationFrame(adjustPosition);
+               } else {
+                   // Ajustar a la posición final correcta
+                   this.element.style.left = `${finalTargetX}px`;
+                   this.element.style.top = `${finalTargetY}px`;
+               }
+           };
+    
+           adjustPosition();
+       }
+    
+       easeInOutCubic(t) {
+           return t < 0.5 ? 2 * t * t * t : 1 - Math.pow(-5 * t + 2, 3) / 2; 
+       }
+    
+       ease(currentValue, targetValue, speed) {
+           return currentValue + (targetValue - currentValue) * speed;
+       }
+    }
+    class DropIn {
+        constructor(element, dropOutInstance) {
+            this.element = element;
+            this.dropOutInstance = dropOutInstance;
+            this.init();
+        }
+    
+        init() {
+            document.addEventListener('mousemove', this.checkCollision.bind(this));
+            window.addEventListener('resize', this.checkCollision.bind(this));
+        }
+    
+        checkCollision() {
+            const draggableDivs = document.getElementsByClassName('draggable');
+            const totalDraggables = draggableDivs.length;
+    
+            const dropInRect = this.element.getBoundingClientRect();
+            const spacing = 5; // Spacing between items
+    
+            // Calculate dynamic grid layout
+            let columns = 1;
+            while (columns * (columns + 1) < totalDraggables) columns++;
+            const rows = Math.ceil(totalDraggables / columns);
+    
+            // Get first draggable dimensions (assuming all are same size)
+            const draggableWidth = totalDraggables > 0 ? draggableDivs[0].offsetWidth : 0;
+            const draggableHeight = totalDraggables > 0 ? draggableDivs[0].offsetHeight : 0;
+    
+            for (let i = 0; i < totalDraggables; i++) {
+                const draggableDiv = draggableDivs[i];
+                if (!this.isWithinCircle(draggableDiv, dropInRect)) continue;
+    
+                const row = Math.floor(i / columns);
+                const col = i % columns;
+                
+                // Calculate positions
+                let itemsInRow = columns;
+                if (row === rows - 1) {
+                    itemsInRow = totalDraggables - (columns * (rows - 1));
+                }
+    
+                // Center items in row
+                const rowWidth = itemsInRow * draggableWidth + (itemsInRow - 1) * spacing;
+                const startX = dropInRect.left + (dropInRect.width - rowWidth) / 2;
+                const startY = dropInRect.top + (dropInRect.height - (rows * draggableHeight + (rows - 1) * spacing)) / 2;
+    
+                const targetX = startX + col * (draggableWidth + spacing);
+                const targetY = startY + row * (draggableHeight + spacing);
+    
+                this.centerDraggable(draggableDiv, targetX, targetY);
+            }
+        }
+    
+        isWithinCircle(draggableDiv, dropInRect) {
+            const draggableRect = draggableDiv.getBoundingClientRect();
+            const draggableCenterX = draggableRect.left + draggableRect.width / 2;
+            const draggableCenterY = draggableRect.top + draggableRect.height / 2;
+            const dropInCenterX = dropInRect.left + dropInRect.width / 2;
+            const dropInCenterY = dropInRect.top + dropInRect.height / 2;
+            const radius = dropInRect.height * 0.4;
+    
+            const distanceX = draggableCenterX - dropInCenterX;
+            const distanceY = draggableCenterY - dropInCenterY;
+            return (distanceX * distanceX + distanceY * distanceY) < radius * radius;
+        }
+    
+        centerDraggable(draggableDiv, targetX, targetY) {
+            draggableDiv.style.transition = 'left 0.3s ease-out, top 0.3s ease-out';
+            draggableDiv.style.left = `${targetX}px`;
+            draggableDiv.style.top = `${targetY}px`;
+            
+            // Remove transition after animation completes
+            setTimeout(() => {
+                draggableDiv.style.transition = '';
+            }, 300);
+        }
+    }
+    class DropOut {
+        constructor(element) {
+            this.element = element;
+        }
+    
+        handleDropOut(draggableDiv) {
+            // Animar el movimiento hacia fuera suavemente
+            const { left: currentX, top: currentY } = draggableDiv.getBoundingClientRect();
+            
+            // Definir un destino aleatorio o una posición fuera del área de DropIn
+            const targetX = currentX + (Math.random() * 200 - 100); // Mover aleatoriamente en X
+            const targetY = currentY + (Math.random() * 200 - 100); // Mover aleatoriamente en Y
+    
+            this.animateDraggableToPosition(draggableDiv, targetX, targetY);
+        }
+    
+        animateDraggableToPosition(draggableDiv, targetX, targetY) {
+            let startTime;
+    
+            const animateStep = (timestamp) => {
+                if (!startTime) startTime = timestamp; // Inicializar el tiempo de inicio
+                const elapsedTime = timestamp - startTime;
+    
+                // Normalizar el tiempo entre 0 y 1 para una animación suave
+                let t = Math.min(elapsedTime / 500, 1); // Duración total de 500 ms
+    
+                // Easing cúbico in-out
+                t = this.easeInOutCubic(t);
+    
+                // Calcular nueva posición hacia el objetivo
+                const newPosx = parseFloat(draggableDiv.style.left) + (targetX - parseFloat(draggableDiv.style.left)) * t;
+                const newPosy = parseFloat(draggableDiv.style.top) + (targetY - parseFloat(draggableDiv.style.top)) * t;
+    
+                draggableDiv.style.left = `${newPosx}px`;
+                draggableDiv.style.top = `${newPosy}px`;
+    
+                if (t < 1) {
+                    requestAnimationFrame(animateStep);
+                }
+            };
+    
+            requestAnimationFrame(animateStep);
+        }
+    
+        easeInOutCubic(t) {
+            return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; 
+        }
+    }
+
+    // Obtener todos los elementos con la clase 'draggable'
+    const draggableDivs = document.getElementsByClassName('draggable');
+    const dropinDivs = document.getElementsByClassName('dropin');
+    const dropoutDivs = document.getElementsByClassName('dropout');
+    
+    // Crear una instancia de Draggable para cada div arrastrable
+    for (let i = 0; i < draggableDivs.length; i++) {
+        new Draggable(draggableDivs[i]);
+    }
+    for (let j = 0; j < dropinDivs.length; j++) {
+       new DropIn(dropinDivs[j]);
+    }
+    for (let k = 0; k < dropoutDivs.length; k++) {
+       new DropOut(dropoutDivs[k]);
+    }
+</script>
+
+</body>
+</html>
