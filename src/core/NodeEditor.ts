@@ -349,24 +349,28 @@ export class NodeEditor {
     // Obtener orden de ejecución
     const executionOrder = this.findExecutionOrder();
 
-    // Computar nodos en orden
-    executionOrder.forEach(node => {
-      // Propagar valores de entrada
-      this.links.forEach(link => {
-        if (link && link[1] && link[1].parent === node) {
-          link[1].value = link[0].value;
+    // Computar nodos en orden (soporte asíncrono)
+    (async () => {
+      for (const node of executionOrder) {
+        // Propagar valores de entrada
+        this.links.forEach(link => {
+          if (link && link[1] && link[1].parent === node) {
+            link[1].value = link[0].value;
+          }
+        });
+
+        // Computar el nodo (soporta async)
+        if (typeof node.compute === 'function') {
+          await node.compute();
         }
-      });
 
-      // Computar el nodo
-      node.compute();
-
-      // Debug
-      console.log('Computed node:', node.type, {
-        inputs: node.inputs.map(pin => pin.value),
-        outputs: node.outputs.map(pin => pin.value)
-      });
-    });
+        // Debug
+        console.log('Computed node:', node.type, {
+          inputs: node.inputs.map(pin => pin.value),
+          outputs: node.outputs.map(pin => pin.value)
+        });
+      }
+    })();
   }
 
   render(ctx: CanvasRenderingContext2D, width: number, height: number) {
@@ -378,44 +382,6 @@ export class NodeEditor {
     ctx.translate(width / 2, height / 2);
     ctx.scale(100 * this.scale, 100 * this.scale);
     ctx.translate(-this.viewOffset.x, -this.viewOffset.y);
-
-    // Dibujar cuadrícula
-    const gridSize = 0.5; // Tamaño de cada celda de la cuadrícula
-    const bounds = this.getCanvasBounds();
-    const startX = Math.floor(bounds.min.x / gridSize) * gridSize;
-    const startY = Math.floor(bounds.min.y / gridSize) * gridSize;
-    const endX = Math.ceil(bounds.max.x / gridSize) * gridSize;
-    const endY = Math.ceil(bounds.max.y / gridSize) * gridSize;
-
-    ctx.beginPath();
-    ctx.strokeStyle = 'rgba(60, 60, 60, 0.4)';
-    ctx.lineWidth = 0.01;
-
-    // Líneas verticales
-    for (let x = startX; x <= endX; x += gridSize) {
-      ctx.moveTo(x, startY);
-      ctx.lineTo(x, endY);
-    }
-    // Líneas horizontales
-    for (let y = startY; y <= endY; y += gridSize) {
-      ctx.moveTo(startX, y);
-      ctx.lineTo(endX, y);
-    }
-    ctx.stroke();
-
-    // Líneas principales más oscuras (cada 5 celdas)
-    ctx.beginPath();
-    ctx.strokeStyle = 'rgba(80, 80, 80, 0.6)';
-    ctx.lineWidth = 0.02;
-    for (let x = startX; x <= endX; x += gridSize * 5) {
-      ctx.moveTo(x, startY);
-      ctx.lineTo(x, endY);
-    }
-    for (let y = startY; y <= endY; y += gridSize * 5) {
-      ctx.moveTo(startX, y);
-      ctx.lineTo(endX, y);
-    }
-    ctx.stroke();
 
     this.renderLinks(ctx);
     this.renderTempLink(ctx);
@@ -465,26 +431,45 @@ export class NodeEditor {
       ctx.shadowOffsetX = 0.05;
       ctx.shadowOffsetY = 0.05;
 
-      // Fondo del nodo con gradiente
-      const gradient = ctx.createLinearGradient(
-        node.pos.x - w/2, node.pos.y - h/2,
-        node.pos.x - w/2, node.pos.y + h/2
-      );
-      
-      if (node.selected) {
-        gradient.addColorStop(0, 'rgb(80, 120, 180)');
-        gradient.addColorStop(1, 'rgb(60, 100, 160)');
+      // Fondo del nodo con gradiente o color lógico para ConditionNode
+      let fillStyle: CanvasGradient | string;
+      let highlight = false;
+      if (node.type === 'condition') {
+        // Color según la salida lógica
+        const isTrue = node.outputs[0]?.value === true;
+        fillStyle = isTrue ? 'rgb(80, 200, 120)' : 'rgb(200, 80, 80)';
+        highlight = node.highlightUntil > Date.now();
       } else {
-        gradient.addColorStop(0, 'rgb(70, 70, 70)');
-        gradient.addColorStop(1, 'rgb(50, 50, 50)');
+        const gradient = ctx.createLinearGradient(
+          node.pos.x - w/2, node.pos.y - h/2,
+          node.pos.x - w/2, node.pos.y + h/2
+        );
+        if (node.selected) {
+          gradient.addColorStop(0, 'rgb(80, 120, 180)');
+          gradient.addColorStop(1, 'rgb(60, 100, 160)');
+        } else {
+          gradient.addColorStop(0, 'rgb(70, 70, 70)');
+          gradient.addColorStop(1, 'rgb(50, 50, 50)');
+        }
+        fillStyle = gradient;
       }
-      
-      ctx.fillStyle = gradient;
+      ctx.fillStyle = fillStyle;
       // Dibujar nodo con esquinas redondeadas
       ctx.beginPath();
       ctx.roundRect(node.pos.x - w/2, node.pos.y - h/2, w, h, 0.1);
       ctx.fill();
-      
+      // Animación visual: resplandor
+      if (highlight) {
+        ctx.save();
+        ctx.shadowColor = 'yellow';
+        ctx.shadowBlur = 0.25;
+        ctx.beginPath();
+        ctx.roundRect(node.pos.x - w/2, node.pos.y - h/2, w, h, 0.1);
+        ctx.strokeStyle = 'yellow';
+        ctx.lineWidth = 0.07;
+        ctx.stroke();
+        ctx.restore();
+      }
       ctx.restore();
 
       // Título del nodo
@@ -503,12 +488,20 @@ export class NodeEditor {
         ctx.textAlign = 'center';
         const value = node.outputs[0].value;
         ctx.fillText(value.toString(), node.pos.x, node.pos.y + 0.1);
-      } else if (node.type === 'output/display') {
+      } else if (node.type === 'output' || node.title.toLowerCase().includes('output')) {
         ctx.fillStyle = 'rgb(150, 255, 150)';
         ctx.font = '0.14px sans-serif';
         ctx.textAlign = 'center';
-        const value = node.inputs[0].value;
-        ctx.fillText(value !== undefined ? value.toString() : '-', node.pos.x, node.pos.y + 0.1);
+        const value = node.inputs[0]?.value;
+        ctx.fillText(value !== undefined ? value.toString() : '-', node.pos.x, node.pos.y + 0.18);
+      } else if (node.type === 'condition') {
+        ctx.fillStyle = 'white';
+        ctx.font = '0.13px sans-serif';
+        ctx.textAlign = 'center';
+        const valTrue = node.outputs[0]?.value;
+        const valFalse = node.outputs[1]?.value;
+        ctx.fillText(`true: ${valTrue ? '✔️' : '❌'} | false: ${valFalse ? '✔️' : '❌'}`,
+          node.pos.x, node.pos.y + 0.18);
       }
     }
   }

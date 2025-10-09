@@ -43,13 +43,20 @@ export interface PinDefinition {
   defaultValue?: any;
 }
 
+export interface INode {
+  type: string;
+  inputs: Pin[];
+  outputs: Pin[];
+  pos: Vec2;
+}
+
 export interface NodeDefinition {
   type: string;
   category: string;
   title: string;
   inputs: PinDefinition[];
   outputs: PinDefinition[];
-  compute?: (inputs: any[]) => any[];
+  compute?: (inputs: any[], node?: INode) => any[];
 }
 
 export interface InputState {

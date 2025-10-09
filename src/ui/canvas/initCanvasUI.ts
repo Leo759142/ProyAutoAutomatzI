@@ -10,6 +10,140 @@ import { Vec2, InputState } from '../../types/types';
 import { Pin } from '../../core/Node';
 
 export function initCanvasUI() {
+  // Overlay input for editing node values
+  let inputOverlay: HTMLDivElement | null = null;
+  function showInputOverlay(node: any) {
+    if (!inputOverlay) {
+      inputOverlay = document.createElement('div');
+      inputOverlay.style.position = 'absolute';
+      inputOverlay.style.zIndex = '1000';
+      inputOverlay.style.background = '#222';
+      inputOverlay.style.border = '1px solid #888';
+      inputOverlay.style.padding = '8px';
+      inputOverlay.style.borderRadius = '6px';
+      inputOverlay.style.color = '#fff';
+      inputOverlay.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+      document.body.appendChild(inputOverlay);
+    }
+    inputOverlay.innerHTML = '';
+
+    // Title for the overlay
+    const title = document.createElement('div');
+    title.textContent = node.title;
+    title.style.fontWeight = 'bold';
+    title.style.marginBottom = '8px';
+    title.style.borderBottom = '1px solid #444';
+    title.style.paddingBottom = '4px';
+    inputOverlay.appendChild(title);
+
+    // Container for inputs
+    const inputsContainer = document.createElement('div');
+    inputsContainer.style.display = 'flex';
+    inputsContainer.style.flexDirection = 'column';
+    inputsContainer.style.gap = '8px';
+    inputOverlay.appendChild(inputsContainer);
+
+    // Function to create an input element based on pin type
+    function createInputForPin(pin: any, isInput: boolean) {
+      const container = document.createElement('div');
+      container.style.display = 'flex';
+      container.style.alignItems = 'center';
+      container.style.gap = '8px';
+
+      const label = document.createElement('label');
+      label.textContent = pin.name + ':';
+      label.style.minWidth = '80px';
+      container.appendChild(label);
+
+      let input: HTMLInputElement;
+      if (pin.type === 0) { // PinType.Number
+        input = document.createElement('input');
+        input.type = 'number';
+        input.value = (pin.value ?? pin.definition?.defaultValue ?? 0).toString();
+        input.step = 'any';
+        input.style.width = '80px';
+      } else if (pin.type === 2) { // PinType.Boolean
+        input = document.createElement('input');
+        input.type = 'checkbox';
+        input.checked = pin.value ?? pin.definition?.defaultValue ?? false;
+      } else {
+        input = document.createElement('input');
+        input.type = 'text';
+        input.value = (pin.value ?? pin.definition?.defaultValue ?? '').toString();
+        input.style.width = '120px';
+      }
+
+      // Style the input
+      input.style.background = '#333';
+      input.style.border = '1px solid #555';
+      input.style.color = '#fff';
+      input.style.padding = '4px 8px';
+      input.style.borderRadius = '4px';
+
+      // If pin is connected, disable input
+      const isConnected = editor.links.some(link => 
+        link && (link[0] === pin || link[1] === pin)
+      );
+      if (isConnected && isInput) {
+        input.disabled = true;
+        input.style.opacity = '0.5';
+        container.title = 'Connected - unlink to edit';
+      }
+
+      container.appendChild(input);
+
+      // Update value on change
+      input.oninput = () => {
+        if (pin.type === 0) { // PinType.Number
+          pin.value = parseFloat(input.value) || 0;
+        } else if (pin.type === 2) { // PinType.Boolean
+          pin.value = input.checked;
+        } else {
+          pin.value = input.value;
+        }
+        editor.computeAll();
+      };
+
+      return container;
+    }
+
+    // Add inputs section if node has inputs
+    if (node.inputs.length > 0) {
+      const inputsTitle = document.createElement('div');
+      inputsTitle.textContent = 'Inputs';
+      inputsTitle.style.fontSize = '0.9em';
+      inputsTitle.style.color = '#aaa';
+      inputsTitle.style.marginTop = '4px';
+      inputsContainer.appendChild(inputsTitle);
+
+      node.inputs.forEach((pin: any) => {
+        inputsContainer.appendChild(createInputForPin(pin, true));
+      });
+    }
+
+    // Add outputs section if node has outputs
+    if (node.outputs.length > 0) {
+      const outputsTitle = document.createElement('div');
+      outputsTitle.textContent = 'Outputs';
+      outputsTitle.style.fontSize = '0.9em';
+      outputsTitle.style.color = '#aaa';
+      outputsTitle.style.marginTop = '8px';
+      inputsContainer.appendChild(outputsTitle);
+
+      node.outputs.forEach((pin: any) => {
+        inputsContainer.appendChild(createInputForPin(pin, false));
+      });
+    }
+
+    inputOverlay.style.display = 'block';
+    // Position overlay near node
+    const screenPos = worldToScreenLocal(node.pos);
+    inputOverlay.style.left = (screenPos.x + 40) + 'px';
+    inputOverlay.style.top = (screenPos.y + 40) + 'px';
+  }
+  function hideInputOverlay() {
+    if (inputOverlay) inputOverlay.style.display = 'none';
+  }
   const canvas = document.getElementById('nodeCanvas') as HTMLCanvasElement;
   if (!canvas) throw new Error('Canvas element not found');
   const ctx = canvas.getContext('2d')!;
@@ -269,11 +403,32 @@ export function initCanvasUI() {
     for (const node of selection.selectedNodes) {
   const pos = worldToScreenLocal(node.pos);
   ctx.save();
-  ctx.strokeStyle = 'rgba(0, 123, 255, 0.8)';
-  ctx.lineWidth = 2;
-  // Dibujar rectángulo centrado en el nodo
-  ctx.strokeRect(pos.x - 20, pos.y - 12, 40, 24);
+  // Zona de drag: header/título, pero círculo pequeño y a la izquierda
+  const nodeWidth = 80 * editor.scale; // Ancho estimado del nodo
+  const headerHeight = 18 * editor.scale;
+  // Rectángulo centrado en el header, alineado con el holder de draggable
+  const rectWidth = 28 * editor.scale;
+  const rectHeight = headerHeight;
+  const rectX = pos.x - rectWidth / 2;
+  const rectY = pos.y - headerHeight;
+  ctx.save();
+  ctx.fillStyle = 'rgba(0, 123, 255, 0.18)';
+  ctx.strokeStyle = 'rgba(0, 123, 255, 0.85)';
+  ctx.lineWidth = 2 * editor.scale;
+  ctx.fillRect(rectX, rectY, rectWidth, rectHeight);
+  ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
   ctx.restore();
+    }
+    // Show input overlay for any selected node
+    let selectedNode = null;
+    for (const node of selection.selectedNodes) {
+      selectedNode = node;
+      break; // Show overlay for the first selected node
+    }
+    if (selectedNode) {
+      showInputOverlay(selectedNode);
+    } else {
+      hideInputOverlay();
     }
     requestAnimationFrame(loop);
   }

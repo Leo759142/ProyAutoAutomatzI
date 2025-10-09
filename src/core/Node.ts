@@ -36,13 +36,12 @@ export class Node {
   inputs: Pin[] = [];
   outputs: Pin[] = [];
   size: Vec2;
-  public draggable: DraggableNode;
+  private draggable: DraggableNode;
+  // Animación para ConditionNode
+  public highlightUntil: number = 0;
 
   constructor(private definition: NodeDefinition) {
-    // Ajustar tamaño para coincidir con la cuadrícula (0.5 unidades)
-    const width = 1.5; // 3 celdas de ancho
-    const height = Math.max(1.0, Math.ceil(Math.max(definition.inputs.length, definition.outputs.length) * 0.5) * 0.5);
-    this.size = new Vec2(width, height);
+    this.size = new Vec2(2.0, Math.max(1.0, Math.max(definition.inputs.length, definition.outputs.length) * 0.5));
     
     // Initialize pins
     definition.inputs.forEach((pinDef, index) => {
@@ -87,7 +86,7 @@ export class Node {
   compute() {
     if (this.definition.compute) {
       const inputValues = this.inputs.map(pin => pin.value);
-      const outputValues = this.definition.compute(inputValues);
+      const outputValues = this.definition.compute(inputValues, this);
       this.outputs.forEach((pin, index) => {
         pin.value = outputValues[index];
       });

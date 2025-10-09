@@ -72,10 +72,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (addNodeBtn) {
     addNodeBtn.addEventListener('click', () => {
+      // Get center of canvas in screen coordinates
+      const canvas = document.getElementById('nodeCanvas') as HTMLCanvasElement;
+      const centerScreen = {
+        x: canvas.width / 2,
+        y: canvas.height / 2
+      };
+      // Convert to world coordinates using canvasUI.screenToWorld
+      const centerWorld = canvasUI.screenToWorld(centerScreen);
       if (nodeTypeSelect && nodeTypeSelect.value) {
-        canvasUI.editor.addNode(nodeTypeSelect.value);
+        canvasUI.editor.addNode(nodeTypeSelect.value, centerWorld.x, centerWorld.y);
       } else {
-        canvasUI.editor.addNode();
+        canvasUI.editor.addNode('number', centerWorld.x, centerWorld.y);
       }
     });
   }

@@ -1,6 +1,22 @@
 import { NodeDefinition, PinType, PinMode } from '../types/types';
 
 export const NodeTypes: { [key: string]: NodeDefinition } = {
+    "condition": {
+        type: "condition",
+        category: "logic",
+        title: "Condition (>10)",
+        inputs: [{
+            name: "value",
+            type: PinType.Number,
+            mode: PinMode.Input,
+            defaultValue: 0
+        }],
+        outputs: [
+            { name: "true", type: PinType.Boolean, mode: PinMode.Output },
+            { name: "false", type: PinType.Boolean, mode: PinMode.Output }
+        ],
+        compute: (inputs: any[]) => [inputs[0] > 10, inputs[0] <= 10]
+    },
     "number": {
         type: "number",
         category: "input",
@@ -12,7 +28,10 @@ export const NodeTypes: { [key: string]: NodeDefinition } = {
             mode: PinMode.Output,
             defaultValue: 0
         }],
-        compute: () => [0]
+        compute: (inputs: any[]) => {
+            // Return empty array to prevent overriding the value
+            return [];
+        }
     },
 
     "boolean": {

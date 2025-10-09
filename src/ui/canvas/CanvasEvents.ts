@@ -165,39 +165,8 @@ export function handleMouseUp(manager: any, e: MouseEvent) {
 }
 
 export function handleWheel(manager: any, e: WheelEvent) {
-  e.preventDefault();
-    
-  // Obtener la posición del mouse en coordenadas del mundo antes del zoom
-  const mouseWorldPos = manager.screenToWorld(manager.inpt.mousePos);
-    
-  // Ajustar el zoom
-  const zoomFactor = 1 - e.deltaY * 0.001;
-  const newScale = Math.max(0.1, Math.min(2, manager.editor.scale * zoomFactor));
-  
-  // Actualizar el input range si existe
-  const zoomRange = document.getElementById('zoomRange') as HTMLInputElement;
-  if (zoomRange) {
-    zoomRange.value = (newScale * 100).toString();
-  }
-  
-  // Actualizar el span de zoom si existe
-  const zoomDisplay = document.getElementById('zoom');
-  if (zoomDisplay) {
-    zoomDisplay.textContent = `${Math.round(newScale * 100)}%`;
-  }
-  
-  // Aplicar el nuevo zoom
-  manager.editor.scale = newScale;
-  manager.inpt.scale = newScale;
-    
-  // Obtener la nueva posición del mouse en coordenadas del mundo
-  const newMouseWorldPos = manager.screenToWorld(manager.inpt.mousePos);
-    
-  // Ajustar el offset para mantener el punto bajo el cursor
-  manager.editor.viewOffset.x += newMouseWorldPos.x - mouseWorldPos.x;
-  manager.editor.viewOffset.y += newMouseWorldPos.y - mouseWorldPos.y;
-    
-  manager.updateOverlay(manager.inpt.mousePos);
+  // El zoom ahora se maneja en initCanvasUI.ts, aquí no se hace nada
+  // (mantener la función para compatibilidad, pero vacía)
 }
 
 export function handleKeyDown(manager: any, e: KeyboardEvent) {
@@ -224,14 +193,26 @@ export function handleKeyDown(manager: any, e: KeyboardEvent) {
     }
   } else if (key === 'a' && !e.ctrlKey && !e.altKey) {
     e.preventDefault();
-    const nodeTypeSelect = document.getElementById('nodeTypeSelect') as HTMLSelectElement;
+    const nodeTypeSelect = document.getElementById('nodeTypeSelect');
     const worldPos = manager.screenToWorld(manager.inpt.mousePos);
-    let nodeType = (nodeTypeSelect && nodeTypeSelect.value) ? nodeTypeSelect.value : 'number';
-    const node = manager.Node.create(nodeType, worldPos.x, worldPos.y);
-    if (node) {
-      manager.editor.nodes.push(node);
-      manager.selection.selectedNodes.clear();
-      manager.selection.selectedNodes.add(node);
+    let nodeType;
+    if (nodeTypeSelect && nodeTypeSelect.value) nodeType = nodeTypeSelect.value;
+    else {
+      const basicTypes = ['number', 'boolean', 'display'];
+      nodeType = basicTypes[Math.floor(Math.random() * basicTypes.length)];
+    }
+    const alreadyExists = manager.editor.nodes.some((node: any) => {
+      const dx = node.pos.x - worldPos.x;
+      const dy = node.pos.y - worldPos.y;
+      return Math.sqrt(dx * dx + dy * dy) < 0.2;
+    });
+    if (!alreadyExists) {
+      const node = manager.Node.create(nodeType, worldPos.x, worldPos.y);
+      if (node) {
+        manager.editor.nodes.push(node);
+        manager.selection.selectedNodes.clear();
+        manager.selection.selectedNodes.add(node);
+      }
     }
   }
 }
@@ -240,11 +221,6 @@ export function handleKeyUp(manager: any, e: KeyboardEvent) {
   const key = e.key.toLowerCase();
   if (manager.keys.has(key)) {
     manager.keys.delete(key);
-    // Actualizar estado de input directamente
-    manager.inpt.shift = manager.keys.has('shift');
-    manager.inpt.ctrl = manager.keys.has('control');
-    manager.inpt.escape = manager.keys.has('escape');
-    manager.inpt.deletePressed = manager.keys.has('delete') || manager.keys.has('backspace');
-    manager.inpt.aPressed = manager.keys.has('a');
+    manager.updateInput();
   }
 }
