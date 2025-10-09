@@ -36,7 +36,7 @@ export class Node {
   inputs: Pin[] = [];
   outputs: Pin[] = [];
   size: Vec2;
-  private draggable: DraggableNode;
+  public draggable: DraggableNode;
 
   constructor(private definition: NodeDefinition) {
     // Ajustar tamaño para coincidir con la cuadrícula (0.5 unidades)
