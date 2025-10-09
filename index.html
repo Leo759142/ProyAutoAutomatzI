@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Node Editor</title>
     <link rel="stylesheet" href="/src/style.css">
+    <script src="https://sql.js.org/dist/sql-wasm.js"></script>
 </head>
 <body>
     <div id="app">
@@ -14,8 +15,14 @@
                 <button id="clearCanvas">Clear Canvas</button>
             </div>
             <div class="toolbar-section execution">
-                <button id="playButton" class="execution-button">▶ Play</button>
-                <button id="stopButton" class="execution-button" disabled>⬛ Stop</button>
+                <button id="playButton" class="execution-button play">
+                    <span>▶</span>
+                    <span>Play</span>
+                </button>
+                <button id="stopButton" class="execution-button stop" disabled>
+                    <span>⬛</span>
+                    <span>Stop</span>
+                </button>
             </div>
             <div class="toolbar-section node-types">
                 <select id="nodeTypeSelect">
@@ -36,6 +43,12 @@
                     </optgroup>
                 </select>
             </div>
+            <div class="toolbar-section">
+                <select id="templateSelect">
+                    <option value="">Seleccionar Template</option>
+                </select>
+                <button id="loadTemplate">Cargar Template</button>
+            </div>
             <div class="tools">
                 <span>Tools:</span>
                 <span>Press 'A' to add node</span>
@@ -45,6 +58,15 @@
             </div>
         </div>
         <canvas id="nodeCanvas"></canvas>
+        <div class="canvas-overlay">
+            <span><span class="label">Coords:</span><span id="coordinates">0, 0</span></span>
+            <span class="zoom-control">
+                <span class="label">Zoom:</span>
+                <input type="range" id="zoomRange" min="90" max="110" value="20" step="1">
+                <span id="zoom">100%</span>
+            </span>
+            <span><span class="label">Mode:</span><span id="mode">Select</span></span>
+        </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
 </body>

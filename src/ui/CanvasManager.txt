@@ -1,0 +1,691 @@
+/*
+MIT License - Copyright (c) 2023 Jaysmito Mukherjee
+*/
+
+import { Vec2, InputState } from '../types/types';
+import { NodeEditor } from '../core/NodeEditor';
+import { Node, Pin } from '../core/Node';
+import { updateOverlay } from './canvas/CanvasOverlay';
+import { screenToWorld, worldToScreen } from './canvas/CanvasUtils';
+import { CanvasSelection } from './canvas/CanvasSelection';
+import { CanvasEventHandlers } from './canvas/CanvasEvents';
+import { CanvasExecution } from './canvas/CanvasExecution';
+
+export class CanvasManager {
+  private canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
+  private editor: NodeEditor;
+  private execution: CanvasExecution;
+  private isMoveMode: boolean = false;
+  private coordsDisplay: HTMLElement;
+  private zoomDisplay: HTMLElement;
+  private modeDisplay: HTMLElement;
+  private inpt: InputState = {
+    scale: 1.0,
+    aspectRatio: 1.0,
+    mousePos: new Vec2(),
+    mouseButtonLeft: false,
+    mouseButtonMiddle: false,
+    mouseButtonRight: false,
+    shift: false,
+    ctrl: false,
+    escape: false,
+    deletePressed: false,
+    aPressed: false,
+  };
+
+  private keys: Set<string> = new Set();
+  private lastTime: number = 0;
+
+  constructor() {
+    this.setupCanvas();
+    this.editor = new NodeEditor(this.onConnect, this.onDrop);
+    this.execution = new CanvasExecution(this.editor);
+    this.setupEventListeners();
+    this.startRenderLoop();
+
+    // Inicializar elementos de UI
+    this.coordsDisplay = document.getElementById('coordinates') || document.createElement('span');
+    this.zoomDisplay = document.getElementById('zoom') || document.createElement('span');
+    this.modeDisplay = document.getElementById('mode') || document.createElement('span');
+
+    // Configurar control de zoom
+    const zoomRange = document.getElementById('zoomRange') as HTMLInputElement;
+    if (zoomRange) {
+      zoomRange.value = '100';
+      zoomRange.addEventListener('input', (e) => {
+        const value = parseInt((e.target as HTMLInputElement).value);
+        this.editor.scale = value / 100;
+        this.updateOverlay(this.inpt.mousePos);
+      });
+    }
+
+    // Añadir atajo de teclado para modo de movimiento
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Space') {
+        this.toggleMoveMode();
+      }
+    });
+
+    document.addEventListener('keyup', (e) => {
+      if (e.key === 'Space') {
+        this.toggleMoveMode();
+      }
+    });
+  }
+
+  private toggleMoveMode() {
+    this.isMoveMode = !this.isMoveMode;
+    this.canvas.style.cursor = this.isMoveMode ? 'grab' : 'default';
+    this.modeDisplay.textContent = this.isMoveMode ? 'Move' : 'Select';
+    if (!this.isMoveMode && this.isDragging) {
+      this.isDragging = false;
+    }
+  }
+
+  private screenToWorld(screenPos: Vec2): Vec2 {
+    return screenToWorld(
+      screenPos,
+      this.canvas,
+      this.editor.scale,
+      this.editor.viewOffset
+    );
+  }
+
+  private updateOverlay(mousePos: Vec2) {
+    updateOverlay(
+      this.coordsDisplay,
+      this.zoomDisplay,
+      this.modeDisplay,
+      mousePos,
+      this.editor.scale
+    );
+  }
+
+  // Cargar un workflow template en el editor
+  loadWorkflowTemplate(template: { nodes_data: string; connections_data: string; }) {
+    try {
+      this.triggerClearCanvas();
+      const nodesData = JSON.parse(template.nodes_data);
+      const connectionsData = JSON.parse(template.connections_data);
+      const nodeMap: { [key: number]: any } = {}; // Para mapear IDs de nodos
+
+      console.log('Loading template with nodes:', nodesData);
+      console.log('Connections to create:', connectionsData);
+
+      // Ajustar la vista para mostrar todos los nodos
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+      // Crear nodos y mantener un registro de ellos
+      for (let i = 0; i < nodesData.length; i++) {
+        const nodeData = nodesData[i];
+        console.log('Creating node:', nodeData);
+        
+        // Actualizar los límites del área
+        if (nodeData.position) {
+          minX = Math.min(minX, nodeData.position.x);
+          minY = Math.min(minY, nodeData.position.y);
+          maxX = Math.max(maxX, nodeData.position.x);
+          maxY = Math.max(maxY, nodeData.position.y);
+        }
+        
+        // Convertir coordenadas relativas a absolutas
+        const absoluteX = (nodeData.position?.x || 0) / 100;
+        const absoluteY = (nodeData.position?.y || 0) / 100;
+        
+        const node = Node.create(nodeData.type, absoluteX, absoluteY);
+        if (node) {
+            if (nodeData.data) {
+              // Transferir datos personalizados
+              if (nodeData.data.value !== undefined && node.outputs.length > 0) {
+                node.outputs[0].value = nodeData.data.value;
+              }
+              // Asignar otras propiedades del nodo si existen en el nodo
+              for (const key in nodeData.data) {
+                if (key !== 'value' && 
+                    nodeData.data.hasOwnProperty(key) && 
+                    key in node) {
+                  (node as any)[key] = nodeData.data[key];
+                }
+              }
+            }          // Asegurarnos de que el nodo está en la posición correcta
+          node.pos.x = absoluteX;
+          node.pos.y = absoluteY;
+          
+          this.editor.nodes.push(node);
+          nodeMap[nodeData.id || i + 1] = node;
+          console.log('Node created and mapped with id:', nodeData.id || i + 1);
+        } else {
+          console.warn('No se pudo crear el nodo:', nodeData.type);
+        }
+      }
+
+      // Crear conexiones usando el mapa de nodos
+      for (const conn of connectionsData) {
+        console.log('Processing connection:', conn);
+        const fromNode = nodeMap[conn.from.node];
+        const toNode = nodeMap[conn.to.node];
+
+        if (fromNode && toNode) {
+          console.log('Found nodes for connection:', {
+            from: { node: conn.from.node, pin: conn.from.pin },
+            to: { node: conn.to.node, pin: conn.to.pin }
+          });
+
+          if (fromNode.outputs[conn.from.pin] && toNode.inputs[conn.to.pin]) {
+            this.onConnect(fromNode.outputs[conn.from.pin], toNode.inputs[conn.to.pin]);
+            console.log('Connection created successfully');
+          } else {
+            console.warn('Pin inválido en conexión:', {
+              fromOutputs: fromNode.outputs.length,
+              toInputs: toNode.inputs.length,
+              requested: conn
+            });
+          }
+        } else {
+          console.warn('Nodo no encontrado para conexión:', {
+            connection: conn,
+            availableNodes: Object.keys(nodeMap)
+          });
+        }
+      }
+
+      // Ajustar la vista para mostrar todos los nodos
+      if (minX !== Infinity && minY !== Infinity) {
+        // Calcular el centro del área de nodos
+        const centerX = (minX + maxX) / 200;
+        const centerY = (minY + maxY) / 200;
+        
+        // Ajustar el offset de la vista para centrar los nodos
+        this.editor.viewOffset.x = centerX;
+        this.editor.viewOffset.y = centerY;
+        
+        // Ajustar el zoom para que se vean todos los nodos
+        const width = (maxX - minX) / 100;
+        const height = (maxY - minY) / 100;
+        const scale = Math.min(
+          window.innerWidth / (width + 2),  // +2 para margen
+          (window.innerHeight - 50) / (height + 2)  // -50 para la toolbar
+        );
+        this.editor.scale = Math.max(0.1, Math.min(1, scale / 200));
+      }
+
+      // Computar los valores iniciales
+      this.editor.computeAll();
+
+      console.log('Template loaded with:', {
+        nodes: this.editor.nodes.length,
+        connections: Object.keys(nodeMap).length,
+        viewOffset: this.editor.viewOffset,
+        scale: this.editor.scale
+      });
+
+    } catch (error) {
+      console.error('Error al cargar el template:', error);
+    }
+  }
+
+  private setupCanvas() {
+    this.canvas = document.getElementById('nodeCanvas') as HTMLCanvasElement;
+    if (!this.canvas) {
+      console.error('Canvas element not found');
+      return;
+    }
+    
+    this.ctx = this.canvas.getContext('2d')!;
+    if (!this.ctx) {
+      console.error('Could not get 2D context');
+      return;
+    }
+
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight - 50; // Adjust for toolbar
+    this.inpt.aspectRatio = this.canvas.width / this.canvas.height;
+
+    // Prevent context menu on right click
+    this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
+  private setupEventListeners() {
+    // Importar handlers desde CanvasEvents
+    const handlers: CanvasEventHandlers = {
+      handleMouseMove: this.handleMouseMove.bind(this),
+      handleMouseDown: this.handleMouseDown.bind(this),
+      handleMouseUp: this.handleMouseUp.bind(this),
+      handleWheel: this.handleWheel.bind(this),
+      handleKeyDown: this.handleKeyDown.bind(this),
+      handleKeyUp: this.handleKeyUp.bind(this)
+    };
+    window.addEventListener('resize', this.handleResize);
+    this.canvas.addEventListener('mousemove', handlers.handleMouseMove);
+    this.canvas.addEventListener('mousedown', handlers.handleMouseDown);
+    this.canvas.addEventListener('mouseup', handlers.handleMouseUp);
+    this.canvas.addEventListener('wheel', handlers.handleWheel);
+    window.addEventListener('keydown', handlers.handleKeyDown);
+    window.addEventListener('keyup', handlers.handleKeyUp);
+  }
+
+  private handleResize = () => {
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
+    this.inpt.aspectRatio = this.canvas.width / this.canvas.height;
+  };
+
+  // Estados del mouse y la interacción
+  private lastMousePos = new Vec2();
+  private isPanning = false;
+  private lastPanPoint = new Vec2();
+  private isDragging = false;
+  private dragStart = new Vec2();
+  private viewOffsetStart = new Vec2();
+  
+  // Estados de selección
+  private selection = new CanvasSelection();
+
+  private drawSelectionBox() {
+    if (!this.selection.isSelecting) return;
+    const ctx = this.ctx;
+    const start = this.selection.selectionStart;
+    const end = this.inpt.mousePos;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0, 123, 255, 0.8)';
+    ctx.fillStyle = 'rgba(0, 123, 255, 0.1)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.rect(
+      Math.min(start.x, end.x),
+      Math.min(start.y, end.y),
+      Math.abs(end.x - start.x),
+      Math.abs(end.y - start.y)
+    );
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  private handleMouseMove = (e: MouseEvent) => {
+    const rect = this.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const screenPos = new Vec2(x, y);
+    const worldPos = this.screenToWorld(screenPos);
+    
+    if (this.isPanning) {
+      // Calcular el delta del movimiento en coordenadas del mundo
+      const dx = (x - this.lastPanPoint.x) / (this.canvas.width * 0.5) / this.editor.scale;
+      const dy = (y - this.lastPanPoint.y) / (this.canvas.height * 0.5) / this.editor.scale;
+      
+      // Actualizar el offset de la vista
+      this.editor.viewOffset.x -= dx;
+      this.editor.viewOffset.y -= dy;
+
+      this.lastPanPoint.x = x;
+      this.lastPanPoint.y = y;
+    } else if (this.selection.isMovingSelection && this.selection.selectedNodes.size > 0) {
+      // Mover los nodos seleccionados
+      const dx = worldPos.x - this.selection.selectionMoveStart.x;
+      const dy = worldPos.y - this.selection.selectionMoveStart.y;
+      for (const node of this.selection.selectedNodes) {
+        const offset = this.selection.nodeOffsets.get(node);
+        if (offset) {
+          node.pos.x = offset.x + dx;
+          node.pos.y = offset.y + dy;
+        }
+      }
+    } else {
+      this.inpt.mousePos.x = x;
+      this.inpt.mousePos.y = y;
+      // Actualizar el cursor si está sobre un nodo
+      if (!this.selection.isSelecting) {
+        let isOverNode = false;
+        for (const node of this.editor.nodes) {
+          const dx = worldPos.x - node.pos.x;
+          const dy = worldPos.y - node.pos.y;
+          if (Math.sqrt(dx * dx + dy * dy) < 0.2) {
+            isOverNode = true;
+            break;
+          }
+        }
+        this.canvas.style.cursor = isOverNode ? 'pointer' : 'default';
+      }
+    }
+
+    // Actualizar overlay con coordenadas y zoom
+    this.updateOverlay(this.inpt.mousePos);
+  };
+
+  private handleMouseDown = (e: MouseEvent) => {
+    const rect = this.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const screenPos = new Vec2(x, y);
+    const worldPos = this.screenToWorld(screenPos);
+
+    if (e.button === 0) {
+      // Click izquierdo
+      if (this.isMoveMode) {
+        this.isDragging = true;
+        this.dragStart.x = x;
+        this.dragStart.y = y;
+        this.viewOffsetStart.x = this.editor.viewOffset.x;
+        this.viewOffsetStart.y = this.editor.viewOffset.y;
+        this.canvas.style.cursor = 'grabbing';
+      } else if (e.shiftKey) {
+        // Iniciar selección en grupo
+        this.selection.isSelecting = true;
+        this.selection.selectionStart = screenPos;
+        this.selection.selectionStartWorld = new Vec2(worldPos.x, worldPos.y);
+        this.canvas.style.cursor = 'crosshair';
+      } else {
+        // Comprobar si el click fue sobre un nodo
+        let clickedNode = null;
+        let clickedOnSelected = false;
+        // Buscar el nodo más cercano al click
+        for (const node of this.editor.nodes) {
+          const dx = worldPos.x - node.pos.x;
+          const dy = worldPos.y - node.pos.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance < 0.2) { // Radio de detección del nodo
+            clickedNode = node;
+            clickedOnSelected = this.selection.selectedNodes.has(node);
+            break;
+          }
+        }
+        if (clickedNode) {
+          if (!clickedOnSelected && !e.ctrlKey) {
+            // Click en un nuevo nodo sin Ctrl - limpiar selección anterior
+            this.selection.selectedNodes.clear();
+          }
+          if (e.ctrlKey && this.selection.selectedNodes.has(clickedNode)) {
+            // Ctrl + Click en nodo seleccionado - deseleccionar
+            this.selection.selectedNodes.delete(clickedNode);
+          } else {
+            // Seleccionar el nodo
+            this.selection.selectedNodes.add(clickedNode);
+          }
+          if (this.selection.selectedNodes.size > 0) {
+            // Iniciar movimiento si hay nodos seleccionados
+            this.selection.isMovingSelection = true;
+            this.selection.selectionMoveStart = new Vec2(worldPos.x, worldPos.y);
+            this.selection.nodeOffsets.clear();
+            // Guardar las posiciones iniciales de los nodos
+            for (const node of this.selection.selectedNodes) {
+              this.selection.nodeOffsets.set(node, new Vec2(node.pos.x, node.pos.y));
+            }
+          }
+        } else {
+          // Click en espacio vacío - limpiar selección
+          if (!e.ctrlKey) {
+            this.selection.selectedNodes.clear();
+          }
+          this.inpt.mouseButtonLeft = true;
+        }
+      }
+    } else if (e.button === 1) {
+      // Botón del medio (rueda) para pan
+      this.inpt.mouseButtonMiddle = true;
+      this.isPanning = true;
+      this.lastPanPoint.x = x;
+      this.lastPanPoint.y = y;
+      this.canvas.style.cursor = 'grabbing';
+    } else if (e.button === 2) {
+      this.inpt.mouseButtonRight = true;
+    }
+    
+    e.preventDefault();
+  };
+
+  private handleWheel = (e: WheelEvent) => {
+    e.preventDefault();
+    
+    // Obtener la posición del mouse en coordenadas del mundo antes del zoom
+    const mouseWorldPos = this.screenToWorld(this.inpt.mousePos);
+    
+    // Ajustar el zoom
+    const zoomFactor = 1 - e.deltaY * 0.001;
+    this.editor.scale = Math.max(0.1, Math.min(2, this.editor.scale * zoomFactor));
+    
+    // Obtener la nueva posición del mouse en coordenadas del mundo
+    const newMouseWorldPos = this.screenToWorld(this.inpt.mousePos);
+    
+    // Ajustar el offset para mantener el punto bajo el cursor
+    this.editor.viewOffset.x += newMouseWorldPos.x - mouseWorldPos.x;
+    this.editor.viewOffset.y += newMouseWorldPos.y - mouseWorldPos.y;
+    
+    // Actualizar el range de zoom si existe
+    const zoomRange = document.getElementById('zoomRange') as HTMLInputElement;
+    if (zoomRange) {
+      zoomRange.value = (this.editor.scale * 100).toString();
+    }
+    
+    this.updateOverlay(this.inpt.mousePos);
+  };
+
+  private handleMouseUp = (e: MouseEvent) => {
+    if (e.button === 0) {
+      if (this.isDragging) {
+        this.isDragging = false;
+        this.canvas.style.cursor = this.isMoveMode ? 'grab' : 'default';
+      }
+
+      this.inpt.mouseButtonLeft = false;
+      
+      if (this.selection.isSelecting) {
+        // Finalizar selección en grupo
+        this.selection.isSelecting = false;
+        this.canvas.style.cursor = 'default';
+        const currentWorldPos = this.screenToWorld(new Vec2(this.inpt.mousePos.x, this.inpt.mousePos.y));
+        const selectionWorldRect = {
+          left: Math.min(this.selection.selectionStartWorld.x, currentWorldPos.x),
+          right: Math.max(this.selection.selectionStartWorld.x, currentWorldPos.x),
+          top: Math.min(this.selection.selectionStartWorld.y, currentWorldPos.y),
+          bottom: Math.max(this.selection.selectionStartWorld.y, currentWorldPos.y)
+        };
+        // Si no se presiona Ctrl, limpiar la selección anterior
+        if (!e.ctrlKey) {
+          this.selection.selectedNodes.clear();
+        }
+        // Seleccionar todos los nodos dentro del rectángulo en coordenadas del mundo
+        for (const node of this.editor.nodes) {
+          if (node.pos.x >= selectionWorldRect.left && 
+              node.pos.x <= selectionWorldRect.right &&
+              node.pos.y >= selectionWorldRect.top && 
+              node.pos.y <= selectionWorldRect.bottom) {
+            // Si se presiona Ctrl y el nodo ya estaba seleccionado, deseleccionarlo
+            if (e.ctrlKey && this.selection.selectedNodes.has(node)) {
+              this.selection.selectedNodes.delete(node);
+            } else {
+              this.selection.selectedNodes.add(node);
+            }
+          }
+        }
+      }
+      if (this.selection.isMovingSelection) {
+        this.selection.isMovingSelection = false;
+        this.selection.nodeOffsets.clear();
+      }
+      // Actualizar el cursor si está sobre un nodo
+      const worldPos = this.screenToWorld(new Vec2(this.inpt.mousePos.x, this.inpt.mousePos.y));
+      for (const node of this.editor.nodes) {
+        const dx = worldPos.x - node.pos.x;
+        const dy = worldPos.y - node.pos.y;
+        if (Math.sqrt(dx * dx + dy * dy) < 0.2) {
+          this.canvas.style.cursor = 'pointer';
+          break;
+        }
+      }
+    }
+
+    if (e.button === 1) {
+      this.inpt.mouseButtonMiddle = false;
+      this.isPanning = false;
+      this.canvas.style.cursor = 'default';
+    }
+    
+    if (e.button === 2) this.inpt.mouseButtonRight = false;
+  };
+
+  private handleAWheel = (e: WheelEvent) => {
+    this.inpt.scale += e.deltaY * -0.001;
+  };
+
+  private handleKeyDown = (e: KeyboardEvent) => {
+    // No procesar teclas si estamos escribiendo en un input
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      return;
+    }
+    
+    const key = e.key.toLowerCase();
+    if (!this.keys.has(key)) {
+      this.keys.add(key);
+      if (key === 'delete' || key === 'backspace') {
+        // Eliminar nodos seleccionados
+        if (this.selection.selectedNodes.size > 0) {
+          const nodesToDelete = new Set(this.selection.selectedNodes);
+          this.editor.nodes = this.editor.nodes.filter(node => !nodesToDelete.has(node));
+          // Limpiar las conexiones de los nodos eliminados
+          this.editor.links = this.editor.links.map(link => {
+            if (!link) return [null, null];
+            const [from, to] = link;
+            if (from && to && (nodesToDelete.has(from.node as Node) || nodesToDelete.has(to.node as Node))) {
+              if (from) from.userData = null;
+              if (to) to.userData = null;
+              return [null, null];
+            }
+            return link;
+          });
+          this.selection.selectedNodes.clear();
+        }
+      } 
+    } else if (key === 'a' && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      const nodeTypeSelect = document.getElementById('nodeTypeSelect') as HTMLSelectElement;
+      const worldPos = this.screenToWorld(this.inpt.mousePos);
+      let nodeType: string;
+      if (nodeTypeSelect && nodeTypeSelect.value) {
+        nodeType = nodeTypeSelect.value;
+      } else {
+        const basicTypes = ['number', 'boolean', 'display'];
+        nodeType = basicTypes[Math.floor(Math.random() * basicTypes.length)];
+      }
+      // Verificar si ya existe un nodo en la posición del cursor
+      const alreadyExists = this.editor.nodes.some(node => {
+        const dx = node.pos.x - worldPos.x;
+        const dy = node.pos.y - worldPos.y;
+        return Math.sqrt(dx * dx + dy * dy) < 0.2;
+      });
+      if (!alreadyExists) {
+        const node = Node.create(nodeType, worldPos.x, worldPos.y);
+        if (node) {
+          this.editor.nodes.push(node);
+          this.selection.selectedNodes.clear();
+          this.selection.selectedNodes.add(node);
+        }
+      }
+    }
+  };
+
+  private handleKeyUp = (e: KeyboardEvent) => {
+    const key = e.key.toLowerCase();
+    if (this.keys.has(key)) {
+      this.keys.delete(key);
+      this.updateInput();
+    }
+  };
+
+  private onConnect = (a: Pin, b: Pin) => {
+    const index = this.editor.links.length;
+    a.userData = index;
+    b.userData = index;
+    this.editor.links[index] = [a, b];
+  };
+
+  private onDrop = (px: number, py: number, a: Pin) => {
+    if (a.userData !== null) {
+      const ind = a.userData;
+      if (this.editor.links[ind]) {
+        this.editor.links[ind][0]!.userData = null;
+        this.editor.links[ind][1]!.userData = null;
+        this.editor.links[ind] = [null, null];
+      }
+    }
+  };
+
+  private updateInput() {
+    this.inpt.shift = this.keys.has('shift');
+    this.inpt.ctrl = this.keys.has('control');
+    this.inpt.escape = this.keys.has('escape');
+    this.inpt.deletePressed = this.keys.has('delete') || this.keys.has('backspace');
+    this.inpt.aPressed = this.keys.has('a');
+  }
+
+  private worldToScreen(worldPos: Vec2): Vec2 {
+    return worldToScreen(
+      worldPos,
+      this.canvas,
+      this.editor.scale,
+      this.editor.viewOffset
+    );
+  }
+
+  private loop = (time: number) => {
+    const deltaTime = time - this.lastTime;
+    this.lastTime = time;
+
+    this.updateInput();
+    this.editor.update(this.inpt, deltaTime);
+    this.editor.render(this.ctx, this.canvas.width, this.canvas.height);
+    
+    // Dibujar el cuadro de selección si está activo
+    if (this.isSelecting) {
+      this.drawSelectionBox();
+    }
+
+    // Resaltar los nodos seleccionados
+    for (const node of this.selection.selectedNodes) {
+      const pos = this.worldToScreen(node.pos);
+      this.ctx.beginPath();
+      this.ctx.strokeStyle = 'rgba(0, 123, 255, 0.8)';
+      this.ctx.lineWidth = 2;
+      this.ctx.arc(pos.x, pos.y, 15, 0, Math.PI * 2);
+      this.ctx.stroke();
+    }
+
+    requestAnimationFrame(this.loop);
+  };
+
+  private startRenderLoop() {
+    requestAnimationFrame(this.loop);
+  }
+
+  // Métodos públicos para la interfaz
+  triggerAddNode(nodeType: string = 'number') {
+    const x = -this.editor.viewOffset.x + (Math.random() * 2 - 1);
+    const y = -this.editor.viewOffset.y + (Math.random() * 2 - 1);
+    const node = Node.create(nodeType, x, y);
+    if (node) {
+      this.editor.nodes.push(node);
+    }
+  }
+
+  triggerClearCanvas() {
+    this.editor.nodes = [];
+    this.editor.links = [];
+  }
+
+  isExecuting() {
+    return this.execution.isExecuting();
+  }
+
+  startExecution() {
+    this.execution.startExecution();
+  }
+
+  pauseExecution() {
+    this.execution.pauseExecution();
+  }
+
+  stopExecution() {
+    this.execution.stopExecution();
+  }
+}

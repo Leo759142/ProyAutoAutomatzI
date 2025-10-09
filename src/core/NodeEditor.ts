@@ -3,6 +3,93 @@ import { Node, Pin } from './Node';
 import { NodeTypes } from './NodeTypes';
 
 export class NodeEditor {
+  /**
+   * Agrega un nodo al editor en una posición aleatoria o especificada
+   */
+  public addNode(nodeType: string = 'number', x?: number, y?: number) {
+    const posX = x ?? -this.viewOffset.x + (Math.random() * 2 - 1);
+    const posY = y ?? -this.viewOffset.y + (Math.random() * 2 - 1);
+    const node = Node.create(nodeType, posX, posY);
+    if (node) {
+      this.nodes.push(node);
+    }
+    return node;
+  }
+
+  /**
+   * Limpia todos los nodos y conexiones del canvas
+   */
+  public clearCanvas() {
+    this.nodes = [];
+    this.links = [];
+  }
+
+  /**
+   * Carga un workflow template en el editor
+   */
+  public loadWorkflowTemplate(template: { nodes_data: string; connections_data: string; }) {
+    try {
+      this.clearCanvas();
+      const nodesData = JSON.parse(template.nodes_data);
+      const connectionsData = JSON.parse(template.connections_data);
+      const nodeMap: { [key: number]: any } = {};
+
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (let i = 0; i < nodesData.length; i++) {
+        const nodeData = nodesData[i];
+        if (nodeData.position) {
+          minX = Math.min(minX, nodeData.position.x);
+          minY = Math.min(minY, nodeData.position.y);
+          maxX = Math.max(maxX, nodeData.position.x);
+          maxY = Math.max(maxY, nodeData.position.y);
+        }
+        const absoluteX = (nodeData.position?.x || 0) / 100;
+        const absoluteY = (nodeData.position?.y || 0) / 100;
+        const node = Node.create(nodeData.type, absoluteX, absoluteY);
+        if (node) {
+          if (nodeData.data) {
+            if (nodeData.data.value !== undefined && node.outputs.length > 0) {
+              node.outputs[0].value = nodeData.data.value;
+            }
+            for (const key in nodeData.data) {
+              if (key !== 'value' && nodeData.data.hasOwnProperty(key) && key in node) {
+                (node as any)[key] = nodeData.data[key];
+              }
+            }
+          }
+          node.pos.x = absoluteX;
+          node.pos.y = absoluteY;
+          this.nodes.push(node);
+          nodeMap[nodeData.id || i + 1] = node;
+        }
+      }
+      for (const conn of connectionsData) {
+        const fromNode = nodeMap[conn.from.node];
+        const toNode = nodeMap[conn.to.node];
+        if (fromNode && toNode) {
+          if (fromNode.outputs[conn.from.pin] && toNode.inputs[conn.to.pin]) {
+            this.onConnect(fromNode.outputs[conn.from.pin], toNode.inputs[conn.to.pin]);
+          }
+        }
+      }
+      if (minX !== Infinity && minY !== Infinity) {
+        const centerX = (minX + maxX) / 200;
+        const centerY = (minY + maxY) / 200;
+        this.viewOffset.x = centerX;
+        this.viewOffset.y = centerY;
+        const width = (maxX - minX) / 100;
+        const height = (maxY - minY) / 100;
+        const scale = Math.min(
+          window.innerWidth / (width + 2),
+          (window.innerHeight - 50) / (height + 2)
+        );
+        this.scale = Math.max(0.1, Math.min(1, scale / 200));
+      }
+      this.computeAll();
+    } catch (error) {
+      console.error('Error al cargar el template:', error);
+    }
+  }
   nodes: Node[] = [];
   links: [Pin | null, Pin | null][] = [];
   viewOffset: Vec2 = new Vec2();
@@ -23,9 +110,42 @@ export class NodeEditor {
   ) {}
 
   private screenToWorld(screenPos: Vec2): Vec2 {
+    const scaleFactor = 100 * this.scale;
     return new Vec2(
-      (screenPos.x - window.innerWidth / 2) / 100 + this.viewOffset.x,
-      (screenPos.y - (window.innerHeight - 50) / 2) / 100 + this.viewOffset.y
+      (screenPos.x - window.innerWidth / 2) / scaleFactor + this.viewOffset.x,
+      (screenPos.y - (window.innerHeight - 50) / 2) / scaleFactor + this.viewOffset.y
+    );
+  }
+
+  private worldToScreen(worldPos: Vec2): Vec2 {
+    const scaleFactor = 100 * this.scale;
+    return new Vec2(
+      (worldPos.x - this.viewOffset.x) * scaleFactor + window.innerWidth / 2,
+      (worldPos.y - this.viewOffset.y) * scaleFactor + (window.innerHeight - 50) / 2
+    );
+  }
+
+  private getCanvasBounds(): { min: Vec2, max: Vec2 } {
+    const topLeft = this.screenToWorld(new Vec2(0, 0));
+    const bottomRight = this.screenToWorld(new Vec2(window.innerWidth, window.innerHeight - 50));
+    return {
+      min: new Vec2(
+        Math.min(topLeft.x, bottomRight.x),
+        Math.min(topLeft.y, bottomRight.y)
+      ),
+      max: new Vec2(
+        Math.max(topLeft.x, bottomRight.x),
+        Math.max(topLeft.y, bottomRight.y)
+      )
+    };
+  }
+
+  private clampToCanvas(pos: Vec2): Vec2 {
+    const bounds = this.getCanvasBounds();
+    const margin = 1; // Margen para evitar que los nodos se peguen al borde
+    return new Vec2(
+      Math.max(bounds.min.x + margin, Math.min(bounds.max.x - margin, pos.x)),
+      Math.max(bounds.min.y + margin, Math.min(bounds.max.y - margin, pos.y))
     );
   }
 
@@ -38,8 +158,9 @@ export class NodeEditor {
   private isPointInNode(point: Vec2, node: Node): boolean {
     const halfW = node.size.x / 2;
     const halfH = node.size.y / 2;
-    return point.x > node.pos.x - halfW && point.x < node.pos.x + halfW &&
-           point.y > node.pos.y - halfH && point.y < node.pos.y + halfH;
+    const dx = Math.abs(point.x - node.pos.x);
+    const dy = Math.abs(point.y - node.pos.y);
+    return dx <= halfW && dy <= halfH;
   }
 
   update(inpt: InputState, deltaTime: number) {
@@ -114,6 +235,7 @@ export class NodeEditor {
           if (this.isPointInNode(currentMouseWorld, node)) {
             this.draggingNode = node;
             node.selected = true;
+            node.startDrag(currentMouseWorld.x, currentMouseWorld.y);
             // Deseleccionar otros nodos
             this.nodes.forEach(n => {
               if (n !== node) n.selected = false;
@@ -125,14 +247,8 @@ export class NodeEditor {
     }
 
     if (this.draggingNode && inpt.mouseButtonLeft) {
-      const delta = currentMouseWorld.subtract(this.screenToWorld(this.lastMousePos));
-      // Aplicar movimiento suave
-      const speed = 0.5;
-      const targetPos = this.draggingNode.pos.add(delta);
-      this.draggingNode.pos = new Vec2(
-        this.draggingNode.pos.x + (targetPos.x - this.draggingNode.pos.x) * speed,
-        this.draggingNode.pos.y + (targetPos.y - this.draggingNode.pos.y) * speed
-      );
+      const bounds = this.getCanvasBounds();
+      this.draggingNode.drag(currentMouseWorld.x, currentMouseWorld.y, bounds);
     }
 
     if (this.draggingPin && inpt.mouseButtonLeft) {
@@ -156,44 +272,101 @@ export class NodeEditor {
       }
       
       if (this.draggingNode) {
-        // Aplicar efecto elástico al soltar
-        const finalPos = this.draggingNode.pos;
-        const elasticEffect = () => {
-          const dampingFactor = 0.8;
-          const springStrength = 0.2;
-          const dx = finalPos.x - this.draggingNode!.pos.x;
-          const dy = finalPos.y - this.draggingNode!.pos.y;
-          
-          if (Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01) {
-            this.draggingNode!.pos = new Vec2(
-              this.draggingNode!.pos.x + dx * springStrength,
-              this.draggingNode!.pos.y + dy * springStrength
-            );
-            requestAnimationFrame(elasticEffect);
-          }
-        };
-        elasticEffect();
+        this.draggingNode.endDrag();
+        this.draggingNode = null;
       }
-      this.draggingNode = null;
     }
+  }
+
+  private validateConnection(from: Pin, to: Pin): boolean {
+    // Verificar que uno sea entrada y otro salida
+    if (from.isInput === to.isInput) {
+      console.warn('No se pueden conectar dos pines del mismo tipo');
+      return false;
+    }
+
+    // Asegurar que from es siempre la salida y to la entrada
+    if (from.isInput) {
+      [from, to] = [to, from];
+    }
+
+    // Verificar tipos compatibles
+    if (from.type !== to.type && from.type !== PinType.Custom && to.type !== PinType.Custom) {
+      console.warn('Tipos incompatibles:', from.type, to.type);
+      return false;
+    }
+
+    // Verificar que la entrada no esté ya conectada (a menos que permita múltiples)
+    const existingConnection = this.links.find(link => 
+      link && link[1] === to && !to.definition.allowMultiple
+    );
+    if (existingConnection) {
+      console.warn('La entrada ya está conectada');
+      return false;
+    }
+
+    return true;
+  }
+
+  private findExecutionOrder(): Node[] {
+    const visited = new Set<Node>();
+    const order: Node[] = [];
+
+    const visit = (node: Node) => {
+      if (visited.has(node)) return;
+      visited.add(node);
+
+      // Primero procesar los nodos que conectan a las entradas de este nodo
+      this.links.forEach(link => {
+        if (link && link[1] && link[1].parent === node) {
+          visit(link[0].parent);
+        }
+      });
+
+      order.push(node);
+    };
+
+    // Comenzar desde los nodos sin salidas (nodos finales)
+    this.nodes.forEach(node => {
+      if (node.outputs.length === 0) {
+        visit(node);
+      }
+    });
+
+    // Procesar cualquier nodo restante
+    this.nodes.forEach(node => visit(node));
+
+    return order;
   }
 
   computeAll() {
     // Resetear valores
     this.nodes.forEach(node => {
       node.inputs.forEach(pin => pin.value = pin.definition.defaultValue);
+      node.outputs.forEach(pin => pin.value = pin.definition.defaultValue);
     });
 
-    // Propagar valores a través de las conexiones
-    this.links.forEach(link => {
-      if (link && link[0] && link[1]) {
-        const [output, input] = link;
-        input.value = output.value;
-      }
-    });
+    // Obtener orden de ejecución
+    const executionOrder = this.findExecutionOrder();
 
-    // Computar todos los nodos
-    this.nodes.forEach(node => node.compute());
+    // Computar nodos en orden
+    executionOrder.forEach(node => {
+      // Propagar valores de entrada
+      this.links.forEach(link => {
+        if (link && link[1] && link[1].parent === node) {
+          link[1].value = link[0].value;
+        }
+      });
+
+      // Computar el nodo
+      node.compute();
+
+      // Debug
+      console.log('Computed node:', node.type, {
+        inputs: node.inputs.map(pin => pin.value),
+        outputs: node.outputs.map(pin => pin.value)
+      });
+    });
   }
 
   render(ctx: CanvasRenderingContext2D, width: number, height: number) {
@@ -205,6 +378,44 @@ export class NodeEditor {
     ctx.translate(width / 2, height / 2);
     ctx.scale(100 * this.scale, 100 * this.scale);
     ctx.translate(-this.viewOffset.x, -this.viewOffset.y);
+
+    // Dibujar cuadrícula
+    const gridSize = 0.5; // Tamaño de cada celda de la cuadrícula
+    const bounds = this.getCanvasBounds();
+    const startX = Math.floor(bounds.min.x / gridSize) * gridSize;
+    const startY = Math.floor(bounds.min.y / gridSize) * gridSize;
+    const endX = Math.ceil(bounds.max.x / gridSize) * gridSize;
+    const endY = Math.ceil(bounds.max.y / gridSize) * gridSize;
+
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(60, 60, 60, 0.4)';
+    ctx.lineWidth = 0.01;
+
+    // Líneas verticales
+    for (let x = startX; x <= endX; x += gridSize) {
+      ctx.moveTo(x, startY);
+      ctx.lineTo(x, endY);
+    }
+    // Líneas horizontales
+    for (let y = startY; y <= endY; y += gridSize) {
+      ctx.moveTo(startX, y);
+      ctx.lineTo(endX, y);
+    }
+    ctx.stroke();
+
+    // Líneas principales más oscuras (cada 5 celdas)
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(80, 80, 80, 0.6)';
+    ctx.lineWidth = 0.02;
+    for (let x = startX; x <= endX; x += gridSize * 5) {
+      ctx.moveTo(x, startY);
+      ctx.lineTo(x, endY);
+    }
+    for (let y = startY; y <= endY; y += gridSize * 5) {
+      ctx.moveTo(startX, y);
+      ctx.lineTo(endX, y);
+    }
+    ctx.stroke();
 
     this.renderLinks(ctx);
     this.renderTempLink(ctx);
