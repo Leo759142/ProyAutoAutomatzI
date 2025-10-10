@@ -39,9 +39,12 @@ export class Node {
   private draggable: DraggableNode;
   // Animación para ConditionNode
   public highlightUntil: number = 0;
+  // Highlight para ejecución paso a paso
+  public stepHighlight: boolean = false;
 
   constructor(private definition: NodeDefinition) {
-    this.size = new Vec2(2.0, Math.max(1.0, Math.max(definition.inputs.length, definition.outputs.length) * 0.5));
+  // Tamaño base aumentado para mejor visibilidad
+  this.size = new Vec2(3.5, Math.max(2.0, Math.max(definition.inputs.length, definition.outputs.length) * 1.0));
     
     // Initialize pins
     definition.inputs.forEach((pinDef, index) => {

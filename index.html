@@ -11,22 +11,29 @@
     <div id="app">
         <div id="toolbar">
             <div class="toolbar-section">
-                <button id="addNode">Add Node (+)</button>
-                <button id="clearCanvas">Clear Canvas</button>
+                <button id="addNode" title="Crear nuevo nodo en el canvas">Add Node (+)</button>
+                <button id="clearCanvas" title="Eliminar todos los nodos">Clear Canvas</button>
             </div>
             <div class="toolbar-section execution">
-                <button id="playButton" class="execution-button play">
+                <button id="playButton" class="execution-button play" title="EJECUTAR los nodos conectados">
                     <span>▶</span>
                     <span>Play</span>
                 </button>
-                <button id="stopButton" class="execution-button stop" disabled>
+                <button id="stopButton" class="execution-button stop" disabled title="Detener la ejecución">
                     <span>⬛</span>
                     <span>Stop</span>
                 </button>
+                <select id="executionMode" title="Modo de Ejecución: Tiempo Real (100ms) o Paso a Paso (1s)">
+                    <option value="realtime">⚡ Tiempo Real (100ms)</option>
+                    <option value="step">🐌 Paso a Paso (1s)</option>
+                </select>
+                <div id="stepInfo" style="display: none;">
+                    <span id="stepCounter">0/0</span>
+                </div>
             </div>
             <div class="toolbar-section node-types">
                 <select id="nodeTypeSelect">
-                    <option value="">Select Node Type...</option>
+                    <option value="" disabled selected>🎯 Selecciona tipo de nodo (o presiona 'A')</option>
                     <optgroup label="Input/Output">
                         <option value="number">Number Input</option>
                         <option value="boolean">Boolean Input</option>
@@ -41,28 +48,160 @@
                         <option value="greater">Greater Than</option>
                         <option value="equals">Equals</option>
                     </optgroup>
+                    <optgroup label="Math">
+                        <option value="add">Add (+)</option>
+                        <option value="subtract">Subtract (-)</option>
+                        <option value="multiply">Multiply (×)</option>
+                        <option value="divide">Divide (÷)</option>
+                        <option value="modulo">Modulo (%)</option>
+                    </optgroup>
+                    <optgroup label="String">
+                        <option value="string">String Input</option>
+                        <option value="concat">Concatenate</option>
+                        <option value="length">Length</option>
+                    </optgroup>
                 </select>
             </div>
             <div class="toolbar-section">
-                <select id="templateSelect">
-                    <option value="">Seleccionar Template</option>
+                <select id="templateSelect" title="Templates de ejemplo listos para usar">
+                    <option value="">📁 Seleccionar Template</option>
                 </select>
-                <button id="loadTemplate">Cargar Template</button>
+                <button id="loadTemplate" title="Cargar el template seleccionado">Cargar Template</button>
+            </div>
+            <div class="toolbar-section help">
+                <button id="helpButton" title="Mostrar/ocultar ayuda">❓ Ayuda</button>
             </div>
             <div class="tools">
                 <span>Tools:</span>
                 <span>Press 'A' to add node</span>
+                <span style="color: #FFD54F; font-weight: bold;">🖱️ DOUBLE-CLICK to edit values</span>
                 <span>Middle mouse to pan</span>
                 <span>Mouse wheel to zoom</span>
                 <span>Delete to remove selected</span>
             </div>
         </div>
         <canvas id="nodeCanvas"></canvas>
+        
+        <!-- Panel de Propiedades del Nodo -->
+        <div id="propertiesPanel" class="properties-panel" style="display: none;">
+            <div class="properties-header">
+                <h3>📝 Propiedades del Nodo</h3>
+                <button id="closeProperties" class="close-button">✕</button>
+            </div>
+            <div class="properties-content">
+                <div class="property-group">
+                    <label>Tipo de Nodo:</label>
+                    <div id="nodeTypeDisplay" class="property-value readonly"></div>
+                </div>
+                <div id="inputProperties"></div>
+            </div>
+            <div class="properties-footer">
+                <button id="applyProperties" class="btn-primary">✔ Aplicar Cambios</button>
+                <button id="cancelProperties" class="btn-secondary">✕ Cancelar</button>
+            </div>
+        </div>
+        
+        <!-- Panel de Ayuda -->
+        <div id="helpPanel" class="help-panel" style="display: none;">
+            <div class="help-content">
+                <button id="closeHelp" class="close-help">✖️</button>
+                <h3>🎯 GUÍA COMPLETA - Editor de Nodos</h3>
+                
+                <div class="help-section">
+                    <h4>🚀 INICIO RÁPIDO:</h4>
+                    <ol>
+                        <li><strong>Carga un Template:</strong> Dropdown "📁 Seleccionar Template" → "🚀 TUTORIAL" → "Cargar"</li>
+                        <li><strong>Presiona ▶ Play:</strong> Los nodos se ejecutan inmediatamente</li>
+                        <li><strong>Observa:</strong> Los valores aparecen bajo cada nodo</li>
+                    </ol>
+                </div>
+
+                <div class="help-section">
+                    <h4>1️⃣ CREAR Y EDITAR NODOS:</h4>
+                    <ul>
+                        <li><strong>Crear:</strong> Botón "Add Node (+)" o tecla <kbd>A</kbd></li>
+                        <li><strong>✏️ EDITAR VALORES:</strong> <kbd>Doble-click</kbd> en el nodo 👈 <strong style="color: #FFD54F;">¡IMPORTANTE!</strong></li>
+                        <li><strong>Aplicar cambios:</strong> Edita valores en panel derecho → "✔ Aplicar"</li>
+                        <li><strong>Mover:</strong> Arrastra desde el centro del nodo</li>
+                        <li><strong>Seleccionar:</strong> Click simple (Ctrl+Click para múltiple)</li>
+                    </ul>
+                    <div class="help-tip">💡 <strong>Para cambiar el valor de un nodo Number de 0 a 50:</strong> Doble-click → Cambiar valor → Aplicar</div>
+                </div>
+
+                <div class="help-section">
+                    <h4>2️⃣ CONECTAR NODOS:</h4>
+                    <ul>
+                        <li><strong>Paso 1:</strong> Click en pin de SALIDA (círculo derecho)</li>
+                        <li><strong>Paso 2:</strong> Arrastra hasta pin de ENTRADA (círculo izquierdo)</li>
+                        <li><strong>Línea amarilla:</strong> Indica conexión exitosa</li>
+                        <li><strong>Eliminar:</strong> Click derecho en conexión</li>
+                    </ul>
+                    <div class="help-tip">⚠️ <strong>Solo se conectan tipos compatibles</strong> (Number→Number, Boolean→Boolean)</div>
+                </div>
+
+                <div class="help-section">
+                    <h4>3️⃣ ▶️ EJECUTAR FLUJO:</h4>
+                    <ul>
+                        <li><strong>▶ Play:</strong> Inicia la ejecución continua</li>
+                        <li><strong>⬛ Stop:</strong> Detiene completamente</li>
+                        <li><strong>Modo Tiempo Real:</strong> Ejecuta cada 100ms (rápido)</li>
+                        <li><strong>Modo Paso a Paso:</strong> Ejecuta cada 1s (ver proceso)</li>
+                    </ul>
+                    <div class="help-tip">🎯 <strong>Los resultados aparecen bajo cada nodo</strong> en tiempo real</div>
+                </div>
+
+                <div class="help-section">
+                    <h4>⌨️ ATAJOS DE TECLADO:</h4>
+                    <table class="shortcuts-table">
+                        <tr><td><kbd>A</kbd></td><td>Agregar nodo en posición del cursor</td></tr>
+                        <tr><td><kbd>Delete</kbd></td><td>Eliminar nodos seleccionados</td></tr>
+                        <tr><td><kbd>Ctrl+G</kbd></td><td>Centrar vista en origen (0,0)</td></tr>
+                        <tr><td><kbd>Rueda</kbd></td><td>Zoom in/out (desde centro)</td></tr>
+                        <tr><td><kbd>Click medio</kbd></td><td>Arrastrar canvas (pan)</td></tr>
+                        <tr><td><kbd>Shift+Drag</kbd></td><td>Selección múltiple</td></tr>
+                    </table>
+                </div>
+
+                <div class="help-section">
+                    <h4>🔧 CREAR NODOS PERSONALIZADOS:</h4>
+                    <p>Edita el archivo <code>src/core/NodeTypes.ts</code>:</p>
+                    <pre class="code-example">
+"mi_nodo": {
+  type: "mi_nodo",
+  category: "custom",
+  title: "Mi Nodo",
+  inputs: [
+    { name: "input", type: PinType.Number }
+  ],
+  outputs: [
+    { name: "result", type: PinType.Number }
+  ],
+  compute: (inputs) => [inputs[0] * 2]
+}</pre>
+                    <div class="help-tip">📝 <strong>Reinicia la app</strong> después de agregar nuevos nodos</div>
+                </div>
+
+                <div class="help-section">
+                    <h4>💾 GUARDAR/CARGAR:</h4>
+                    <ul>
+                        <li><strong>Templates:</strong> Workflows completos con múltiples nodos</li>
+                        <li><strong>Auto-guardado:</strong> Los templates se guardan en navegador</li>
+                        <li><strong>Cargar:</strong> Dropdown + botón "Cargar Template"</li>
+                    </ul>
+                </div>
+
+                <div class="help-section help-footer">
+                    <p>📚 <strong>Más info:</strong> Revisa archivos .md en la raíz del proyecto</p>
+                    <p>🐛 <strong>Problemas?</strong> Verifica la consola del navegador (F12)</p>
+                </div>
+            </div>
+        </div>
+        
         <div class="canvas-overlay">
-            <span><span class="label">Coords:</span><span id="coordinates">0, 0</span></span>
+            <span><span class="label">Coords:</span><span id="coordinates">0.0, 0.0</span></span>
             <span class="zoom-control">
                 <span class="label">Zoom:</span>
-                <input type="range" id="zoomRange" min="90" max="110" value="20" step="1">
+                <input type="range" id="zoomRange" min="20" max="300" value="100" step="5">
                 <span id="zoom">100%</span>
             </span>
             <span><span class="label">Mode:</span><span id="mode">Select</span></span>

@@ -8,6 +8,7 @@ export type CanvasEventHandlers = {
   handleMouseMove: (e: MouseEvent) => void;
   handleMouseDown: (e: MouseEvent) => void;
   handleMouseUp: (e: MouseEvent) => void;
+  handleDblClick: (e: MouseEvent) => void;
   handleWheel: (e: WheelEvent) => void;
   handleKeyDown: (e: KeyboardEvent) => void;
   handleKeyUp: (e: KeyboardEvent) => void;
@@ -57,6 +58,9 @@ export function handleMouseMove(manager: any, e: MouseEvent) {
 }
 
 export function handleMouseDown(manager: any, e: MouseEvent) {
+  // Evitar interferencia si el clic no es en el canvas
+  if (e.target !== manager.canvas && !manager.canvas.contains(e.target)) return;
+  
   const rect = manager.canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
@@ -164,13 +168,81 @@ export function handleMouseUp(manager: any, e: MouseEvent) {
   if (e.button === 2) manager.inpt.mouseButtonRight = false;
 }
 
+export function handleDblClick(manager: any, e: MouseEvent) {
+  // Evento de doble clic: abrir panel de propiedades del nodo
+  e.preventDefault(); // Prevenir comportamiento por defecto
+  e.stopPropagation(); // Evitar propagación
+  
+  const rect = manager.canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const screenPos = new manager.Vec2(x, y);
+  const worldPos = manager.screenToWorld(screenPos);
+
+  console.log('🖱️ Doble-click detectado en:', worldPos);
+
+  // Buscar el nodo bajo el cursor (aumentar radio a 2.0 para mejor detección)
+  let foundNode = null;
+  for (const node of manager.editor.nodes) {
+    const dx = worldPos.x - node.pos.x;
+    const dy = worldPos.y - node.pos.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    console.log(`  Nodo "${node.title}" en (${node.pos.x.toFixed(2)}, ${node.pos.y.toFixed(2)}), distancia: ${distance.toFixed(2)}`);
+    
+    // Radio aumentado para mejor detección (2.0 unidades de mundo)
+    if (distance < 2.0) {
+      foundNode = node;
+      break;
+    }
+  }
+
+  if (foundNode) {
+    // Nodo encontrado: abrir panel de propiedades
+    if (manager.propertiesPanel) {
+      manager.propertiesPanel.show(foundNode);
+      console.log('✅ Abriendo propiedades de:', foundNode.title);
+    } else {
+      console.error('❌ propertiesPanel no existe en manager');
+    }
+  } else {
+    console.log('❌ No se encontró ningún nodo en esta posición');
+  }
+}
+
 export function handleWheel(manager: any, e: WheelEvent) {
-  // El zoom ahora se maneja en initCanvasUI.ts, aquí no se hace nada
-  // (mantener la función para compatibilidad, pero vacía)
+  // Zoom centrado en el CENTRO de la pantalla (más suave y ligero)
+  let scale = manager.editor.scale;
+  const zoomIntensity = 0.05; // Reducido para zoom más suave
+  
+  if (e.deltaY < 0) {
+    scale *= (1 + zoomIntensity);
+  } else {
+    scale *= (1 - zoomIntensity);
+  }
+  
+  scale = Math.max(0.2, Math.min(3, scale)); // Rango ampliado
+  manager.editor.scale = scale;
+  manager.inpt.scale = scale;
+  
+  // El offset se mantiene centrado, no necesita ajuste
+  manager.editor.render(manager.ctx, manager.canvas.width, manager.canvas.height);
+  
+  const rect = manager.canvas.getBoundingClientRect();
+  const centerX = rect.width / 2;
+  const centerY = rect.height / 2;
+  manager.updateOverlay(new manager.Vec2(centerX, centerY));
+  
+  e.preventDefault();
 }
 
 export function handleKeyDown(manager: any, e: KeyboardEvent) {
-  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+  // Evitar interferencia con elementos UI
+  if (e.target instanceof HTMLInputElement || 
+      e.target instanceof HTMLTextAreaElement || 
+      e.target instanceof HTMLSelectElement ||
+      e.target instanceof HTMLButtonElement) return;
+  
   const key = e.key.toLowerCase();
   if (!manager.keys.has(key)) {
     manager.keys.add(key);
@@ -196,7 +268,7 @@ export function handleKeyDown(manager: any, e: KeyboardEvent) {
     const nodeTypeSelect = document.getElementById('nodeTypeSelect');
     const worldPos = manager.screenToWorld(manager.inpt.mousePos);
     let nodeType;
-    if (nodeTypeSelect && nodeTypeSelect.value) nodeType = nodeTypeSelect.value;
+    if (nodeTypeSelect && nodeTypeSelect instanceof HTMLSelectElement && nodeTypeSelect.value) nodeType = nodeTypeSelect.value;
     else {
       const basicTypes = ['number', 'boolean', 'display'];
       nodeType = basicTypes[Math.floor(Math.random() * basicTypes.length)];

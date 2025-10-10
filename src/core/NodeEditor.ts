@@ -1,6 +1,8 @@
 import { Vec2, InputState, PinType } from '../types/types';
 import { Node, Pin } from './Node';
 import { NodeTypes } from './NodeTypes';
+import { ExecutionPluginManager } from './ExecutionPlugin';
+import { BuiltinPlugins } from './plugins/BuiltinPlugins';
 
 export class NodeEditor {
   /**
@@ -95,6 +97,9 @@ export class NodeEditor {
   viewOffset: Vec2 = new Vec2();
   scale: number = 1.0;
   isRunning: boolean = false;
+  
+  // Sistema de plugins
+  public pluginManager: ExecutionPluginManager = new ExecutionPluginManager();
 
   private draggingNode: Node | null = null;
   private draggingPin: Pin | null = null;
@@ -106,8 +111,17 @@ export class NodeEditor {
 
   constructor(
     private onConnect: (a: Pin, b: Pin) => void,
-    private onDrop: (px: number, py: number, a: Pin) => void
-  ) {}
+    private onDrop: (px: number, py: number, a: Pin) => void,
+  ) {
+    // Registrar plugins built-in
+    Object.values(BuiltinPlugins).forEach(plugin => {
+      this.pluginManager.registerPlugin(plugin);
+    });
+    
+    // Activar plugins por defecto
+    this.pluginManager.activatePlugin('safety-limit');
+    this.pluginManager.activatePlugin('type-validation');
+  }
 
   private screenToWorld(screenPos: Vec2): Vec2 {
     const scaleFactor = 100 * this.scale;
@@ -174,11 +188,23 @@ export class NodeEditor {
 
     if (inpt.aPressed && Date.now() - this.lastAddTime > 300) {
       this.lastAddTime = Date.now();
-      const nodeTypes = Object.keys(NodeTypes);
-      const randomType = nodeTypes[Math.floor(Math.random() * nodeTypes.length)];
-      const node = Node.create(randomType, currentMouseWorld.x, currentMouseWorld.y);
+      
+      // Obtener el tipo seleccionado del dropdown
+      const nodeTypeSelect = document.getElementById('nodeTypeSelect') as HTMLSelectElement;
+      let nodeType = 'number'; // Default
+      
+      if (nodeTypeSelect && nodeTypeSelect.value) {
+        nodeType = nodeTypeSelect.value;
+      } else {
+        // Si no hay selección, mostrar mensaje
+        console.warn('⚠️ Por favor selecciona un tipo de nodo en el dropdown antes de presionar "A"');
+        return;
+      }
+      
+      const node = Node.create(nodeType, currentMouseWorld.x, currentMouseWorld.y);
       if (node) {
         this.nodes.push(node);
+        console.log(`✅ Nodo "${nodeType}" creado en (${currentMouseWorld.x.toFixed(1)}, ${currentMouseWorld.y.toFixed(1)})`);
       }
     }
 
@@ -339,7 +365,7 @@ export class NodeEditor {
     return true;
   }
 
-  private findExecutionOrder(): Node[] {
+  public findExecutionOrder(): Node[] {
     const visited = new Set<Node>();
     const order: Node[] = [];
 
@@ -370,7 +396,59 @@ export class NodeEditor {
     return order;
   }
 
-  computeAll() {
+  public async computeSingleNode(node: Node) {
+    // Hook: Antes de ejecutar el nodo
+    const shouldExecute = await this.pluginManager.executeBeforeNodeExecution(node);
+    if (!shouldExecute) return;
+
+    try {
+      // Propagar valores de entrada ANTES de compute para este nodo específico
+      this.links.forEach(link => {
+        if (link && link[0] && link[1] && link[1].parent === node) {
+          const transformedValue = this.pluginManager.transformInput(link[0].value, link[1]);
+          link[1].value = transformedValue;
+        }
+      });
+
+      // Computar el nodo
+      let result = null;
+      if (typeof node.compute === 'function') {
+        result = node.compute();
+      }
+
+      // Aplicar transformaciones a las salidas
+      node.outputs.forEach(pin => {
+        pin.value = this.pluginManager.transformOutput(pin.value, pin);
+      });
+
+      // Hook: Después de ejecutar el nodo
+      await this.pluginManager.executeAfterNodeExecution(node, result);
+    } catch (error) {
+      // Hook: Error en la ejecución del nodo
+      this.pluginManager.getActivePlugins().forEach(plugin => {
+        if (plugin.onError) {
+          plugin.onError(error as Error, node, this.pluginManager.getContext());
+        }
+      });
+    }
+  }
+
+  async computeAll() {
+    // Actualizar contexto del plugin manager
+    this.pluginManager.updateContext({
+      iteration: this.pluginManager.getContext().iteration + 1,
+      startTime: Date.now(),
+      executionMode: 'realtime' // Será actualizado por CanvasExecution
+    });
+
+    // Hook: Antes de la ejecución
+    await this.pluginManager.executeBeforeExecution(this.nodes);
+    
+    // Verificar si debe continuar la ejecución
+    if (!this.pluginManager.shouldContinueExecution()) {
+      return;
+    }
+
     // NO resetear valores de nodos input (number, boolean)
     // Solo resetear inputs de nodos que reciben conexiones
     this.nodes.forEach(node => {
@@ -392,18 +470,44 @@ export class NodeEditor {
 
     // Computar nodos en orden SINCRÓNICAMENTE
     for (const node of executionOrder) {
-      // Propagar valores de entrada ANTES de compute
-      this.links.forEach(link => {
-        if (link && link[0] && link[1] && link[1].parent === node) {
-          link[1].value = link[0].value;
-        }
-      });
+      // Hook: Antes de ejecutar el nodo
+      const shouldExecute = await this.pluginManager.executeBeforeNodeExecution(node);
+      if (!shouldExecute) continue;
 
-      // Computar el nodo
-      if (typeof node.compute === 'function') {
-        node.compute();
+      try {
+        // Propagar valores de entrada ANTES de compute con transformaciones
+        this.links.forEach(link => {
+          if (link && link[0] && link[1] && link[1].parent === node) {
+            const transformedValue = this.pluginManager.transformInput(link[0].value, link[1]);
+            link[1].value = transformedValue;
+          }
+        });
+
+        // Computar el nodo
+        let result = null;
+        if (typeof node.compute === 'function') {
+          result = node.compute();
+        }
+
+        // Aplicar transformaciones a las salidas
+        node.outputs.forEach(pin => {
+          pin.value = this.pluginManager.transformOutput(pin.value, pin);
+        });
+
+        // Hook: Después de ejecutar el nodo
+        await this.pluginManager.executeAfterNodeExecution(node, result);
+      } catch (error) {
+        // Hook: Error en la ejecución del nodo
+        this.pluginManager.getActivePlugins().forEach(plugin => {
+          if (plugin.onError) {
+            plugin.onError(error as Error, node, this.pluginManager.getContext());
+          }
+        });
       }
     }
+
+    // Hook: Después de la ejecución
+    await this.pluginManager.executeAfterExecution(this.nodes);
   }
 
   render(ctx: CanvasRenderingContext2D, width: number, height: number) {
@@ -411,10 +515,60 @@ export class NodeEditor {
     ctx.fillStyle = 'rgb(30, 30, 30)';
     ctx.fillRect(0, 0, width, height);
 
+    // DIBUJAR CUADRICULA Y EJES
     ctx.save();
     ctx.translate(width / 2, height / 2);
     ctx.scale(100 * this.scale, 100 * this.scale);
     ctx.translate(-this.viewOffset.x, -this.viewOffset.y);
+
+    // Cuadrícula principal
+    const gridSpacing = 1;
+    const gridRange = Math.max(width, height) / (100 * this.scale) + 10;
+    
+    // Cuadrícula secundaria (más tenue)
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.lineWidth = 0.01;
+    ctx.beginPath();
+    for (let i = -gridRange; i <= gridRange; i += 0.5) {
+      ctx.moveTo(i, -gridRange);
+      ctx.lineTo(i, gridRange);
+      ctx.moveTo(-gridRange, i);
+      ctx.lineTo(gridRange, i);
+    }
+    ctx.stroke();
+
+    // Cuadrícula principal
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 0.02;
+    ctx.beginPath();
+    for (let i = -gridRange; i <= gridRange; i += gridSpacing) {
+      ctx.moveTo(i, -gridRange);
+      ctx.lineTo(i, gridRange);
+      ctx.moveTo(-gridRange, i);
+      ctx.lineTo(gridRange, i);
+    }
+    ctx.stroke();
+
+    // EJES PRINCIPALES (X e Y)
+    ctx.strokeStyle = 'rgba(255, 0, 0, 0.6)'; // Eje Y (rojo)
+    ctx.lineWidth = 0.04;
+    ctx.beginPath();
+    ctx.moveTo(0, -gridRange);
+    ctx.lineTo(0, gridRange);
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(0, 255, 0, 0.6)'; // Eje X (verde)
+    ctx.lineWidth = 0.04;
+    ctx.beginPath();
+    ctx.moveTo(-gridRange, 0);
+    ctx.lineTo(gridRange, 0);
+    ctx.stroke();
+
+    // Punto origen
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.beginPath();
+    ctx.arc(0, 0, 0.05, 0, 2 * Math.PI);
+    ctx.fill();
 
     this.renderLinks(ctx);
     this.renderTempLink(ctx);
@@ -467,11 +621,19 @@ export class NodeEditor {
       // Fondo del nodo con gradiente o color lógico para ConditionNode
       let fillStyle: CanvasGradient | string;
       let highlight = false;
+      
+      // Verificar si está en ejecución paso a paso
+      const stepExecuting = node.stepHighlight;
+      
       if (node.type === 'condition') {
         // Color según la salida lógica
         const isTrue = node.outputs[0]?.value === true;
         fillStyle = isTrue ? 'rgb(80, 200, 120)' : 'rgb(200, 80, 80)';
         highlight = node.highlightUntil > Date.now();
+      } else if (stepExecuting) {
+        // Highlight especial para ejecución paso a paso
+        fillStyle = 'rgb(255, 215, 0)'; // Dorado
+        highlight = true;
       } else {
         const gradient = ctx.createLinearGradient(
           node.pos.x - w/2, node.pos.y - h/2,
@@ -514,27 +676,59 @@ export class NodeEditor {
       // Renderizar pines
       this.renderPins(ctx, node);
 
-      // Renderizar valores si es un nodo de entrada o salida
-      if (node.type === 'input/number') {
-        ctx.fillStyle = 'rgb(200, 200, 200)';
-        ctx.font = '0.12px sans-serif';
-        ctx.textAlign = 'center';
-        const value = node.outputs[0].value;
-        ctx.fillText(value.toString(), node.pos.x, node.pos.y + 0.1);
-      } else if (node.type === 'output' || node.title.toLowerCase().includes('output')) {
-        ctx.fillStyle = 'rgb(150, 255, 150)';
-        ctx.font = '0.14px sans-serif';
-        ctx.textAlign = 'center';
+      // Renderizar valores según el tipo de nodo
+      ctx.fillStyle = 'white';
+      ctx.font = '0.15px sans-serif';
+      ctx.textAlign = 'center';
+      
+      if (node.type === 'number') {
+        // Nodo Number - mostrar valor del output
+        const value = node.outputs[0]?.value ?? 0;
+        ctx.fillStyle = 'rgb(100, 255, 100)';
+        ctx.fillText(`${value}`, node.pos.x, node.pos.y + 0.2);
+      } else if (node.type === 'boolean') {
+        // Nodo Boolean - mostrar estado
+        const value = node.outputs[0]?.value ?? false;
+        ctx.fillStyle = value ? 'rgb(100, 255, 100)' : 'rgb(255, 100, 100)';
+        ctx.fillText(value ? 'TRUE' : 'FALSE', node.pos.x, node.pos.y + 0.2);
+      } else if (node.type === 'string') {
+        // Nodo String - mostrar valor del output
+        const value = node.outputs[0]?.value ?? "";
+        ctx.fillStyle = 'rgb(150, 150, 255)';
+        const displayText = value.toString().length > 8 ? value.toString().substring(0, 8) + "..." : value.toString();
+        ctx.fillText(`"${displayText}"`, node.pos.x, node.pos.y + 0.2);
+      } else if (node.type === 'display') {
+        // Nodo Display - mostrar valor de entrada
         const value = node.inputs[0]?.value;
-        ctx.fillText(value !== undefined ? value.toString() : '-', node.pos.x, node.pos.y + 0.18);
+        ctx.fillStyle = 'rgb(255, 255, 100)';
+        const displayText = value !== undefined ? value.toString() : 'NULL';
+        ctx.fillText(`→ ${displayText}`, node.pos.x, node.pos.y + 0.2);
       } else if (node.type === 'condition') {
-        ctx.fillStyle = 'white';
-        ctx.font = '0.13px sans-serif';
-        ctx.textAlign = 'center';
+        // Nodo Condition - mostrar ambas salidas
         const valTrue = node.outputs[0]?.value;
         const valFalse = node.outputs[1]?.value;
-        ctx.fillText(`true: ${valTrue ? '✔️' : '❌'} | false: ${valFalse ? '✔️' : '❌'}`,
-          node.pos.x, node.pos.y + 0.18);
+        ctx.fillStyle = 'white';
+        ctx.font = '0.12px sans-serif';
+        ctx.fillText(`T:${valTrue?'✔':'✘'} F:${valFalse?'✔':'✘'}`, node.pos.x, node.pos.y + 0.2);
+      } else if (['add', 'subtract', 'multiply', 'divide', 'modulo', 'greater', 'and', 'or', 'not', 'equals'].includes(node.type)) {
+        // Nodos de operación - mostrar resultado
+        const result = node.outputs[0]?.value;
+        if (result !== undefined) {
+          ctx.fillStyle = 'rgb(255, 200, 100)';
+          const displayText = typeof result === 'boolean' ? (result ? 'TRUE' : 'FALSE') : result.toString();
+          ctx.fillText(`= ${displayText}`, node.pos.x, node.pos.y + 0.2);
+        }
+      } else if (['concat', 'length'].includes(node.type)) {
+        // Nodos de string - mostrar resultado
+        const result = node.outputs[0]?.value;
+        if (result !== undefined) {
+          ctx.fillStyle = 'rgb(200, 150, 255)';
+          let displayText = result.toString();
+          if (node.type === 'concat' && displayText.length > 8) {
+            displayText = displayText.substring(0, 8) + "...";
+          }
+          ctx.fillText(`= ${displayText}`, node.pos.x, node.pos.y + 0.2);
+        }
       }
     }
   }

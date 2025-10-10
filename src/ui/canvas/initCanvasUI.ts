@@ -8,6 +8,7 @@ import { screenToWorld, worldToScreen } from './CanvasUtils';
 import * as CanvasEvents from './CanvasEvents';
 import { Vec2, InputState } from '../../types/types';
 import { Pin } from '../../core/Node';
+import { PropertiesPanel } from '../PropertiesPanel';
 
 export function initCanvasUI() {
   // Overlay input for editing node values
@@ -158,6 +159,7 @@ export function initCanvasUI() {
   const editor = new NodeEditor(onConnect, onDrop);
   const selection = new CanvasSelection();
   const execution = new CanvasExecution(editor);
+  const propertiesPanel = new PropertiesPanel();
   let isMoveMode = false;
   let lastTime = 0;
   let keys: Set<string> = new Set();
@@ -233,27 +235,41 @@ export function initCanvasUI() {
   canvas.addEventListener('mousemove', (e) => CanvasEvents.handleMouseMove({
     canvas, ctx, editor, selection, execution, isMoveMode, lastTime, keys, inpt, lastMousePos, isPanning, lastPanPoint, isDragging, dragStart, viewOffsetStart,
     screenToWorld: screenToWorldLocal, worldToScreen: worldToScreenLocal, updateOverlay: updateOverlayLocal, toggleMoveMode,
-    NodeEditor, Node: editor.constructor, Vec2: editor.viewOffset.constructor
+    NodeEditor, Node: editor.constructor, Vec2: editor.viewOffset.constructor, propertiesPanel
   }, e));
   canvas.addEventListener('mousedown', (e) => CanvasEvents.handleMouseDown({
     canvas, ctx, editor, selection, execution, isMoveMode, lastTime, keys, inpt, lastMousePos, isPanning, lastPanPoint, isDragging, dragStart, viewOffsetStart,
     screenToWorld: screenToWorldLocal, worldToScreen: worldToScreenLocal, updateOverlay: updateOverlayLocal, toggleMoveMode,
-    NodeEditor, Node: editor.constructor, Vec2: editor.viewOffset.constructor
+    NodeEditor, Node: editor.constructor, Vec2: editor.viewOffset.constructor, propertiesPanel
   }, e));
   canvas.addEventListener('mouseup', (e) => CanvasEvents.handleMouseUp({
     canvas, ctx, editor, selection, execution, isMoveMode, lastTime, keys, inpt, lastMousePos, isPanning, lastPanPoint, isDragging, dragStart, viewOffsetStart,
     screenToWorld: screenToWorldLocal, worldToScreen: worldToScreenLocal, updateOverlay: updateOverlayLocal, toggleMoveMode,
-    NodeEditor, Node: editor.constructor, Vec2: editor.viewOffset.constructor
+    NodeEditor, Node: editor.constructor, Vec2: editor.viewOffset.constructor, propertiesPanel
+  }, e));
+  canvas.addEventListener('dblclick', (e) => CanvasEvents.handleDblClick({
+    canvas, ctx, editor, selection, execution, isMoveMode, lastTime, keys, inpt, lastMousePos, isPanning, lastPanPoint, isDragging, dragStart, viewOffsetStart,
+    screenToWorld: screenToWorldLocal, worldToScreen: worldToScreenLocal, updateOverlay: updateOverlayLocal, toggleMoveMode,
+    NodeEditor, Node: editor.constructor, Vec2: editor.viewOffset.constructor, propertiesPanel
   }, e));
   canvas.addEventListener('wheel', (e) => CanvasEvents.handleWheel({
     canvas, ctx, editor, selection, execution, isMoveMode, lastTime, keys, inpt, lastMousePos, isPanning, lastPanPoint, isDragging, dragStart, viewOffsetStart,
     screenToWorld: screenToWorldLocal, worldToScreen: worldToScreenLocal, updateOverlay: updateOverlayLocal, toggleMoveMode,
-    NodeEditor, Node: editor.constructor, Vec2: editor.viewOffset.constructor
+    NodeEditor, Node: editor.constructor, Vec2: editor.viewOffset.constructor, propertiesPanel
   }, e));
   // Manejo de teclas direccionales
   window.addEventListener('keydown', (e) => {
     // Movimiento diagonal y por teclas direccionales
-    const moveSpeed = 0.1 / editor.scale;
+  const moveSpeed = 0.4 / editor.scale; // velocidad aumentada
+    // Atajo Ctrl+G para centrar la vista en (0,0)
+    if (e.ctrlKey && e.key.toLowerCase() === 'g') {
+      editor.viewOffset.x = 0;
+      editor.viewOffset.y = 0;
+      editor.render(ctx, canvas.width, canvas.height);
+      updateOverlayLocal(new Vec2(canvas.width/2, canvas.height/2));
+      e.preventDefault();
+      return;
+    }
     keys.add(e.key.toLowerCase());
     let dx = 0, dy = 0;
     if (keys.has('arrowleft')) dx -= 1;
@@ -275,7 +291,7 @@ export function initCanvasUI() {
     CanvasEvents.handleKeyDown({
       canvas, ctx, editor, selection, execution, isMoveMode, lastTime, keys, inpt, lastMousePos, isPanning, lastPanPoint, isDragging, dragStart, viewOffsetStart,
       screenToWorld: screenToWorldLocal, worldToScreen: worldToScreenLocal, updateOverlay: updateOverlayLocal, toggleMoveMode,
-      NodeEditor, Node: editor.constructor, Vec2: editor.viewOffset.constructor
+      NodeEditor, Node: editor.constructor, Vec2: editor.viewOffset.constructor, propertiesPanel
     }, e);
   });
   
@@ -285,7 +301,7 @@ export function initCanvasUI() {
     CanvasEvents.handleKeyUp({
       canvas, ctx, editor, selection, execution, isMoveMode, lastTime, keys, inpt, lastMousePos, isPanning, lastPanPoint, isDragging, dragStart, viewOffsetStart,
       screenToWorld: screenToWorldLocal, worldToScreen: worldToScreenLocal, updateOverlay: updateOverlayLocal, toggleMoveMode,
-      NodeEditor, Node: editor.constructor, Vec2: editor.viewOffset.constructor
+      NodeEditor, Node: editor.constructor, Vec2: editor.viewOffset.constructor, propertiesPanel
     }, e);
   });
   // Arrastre del canvas con botón izquierdo (sin nodos seleccionados)
@@ -302,10 +318,10 @@ export function initCanvasUI() {
     if (isPanning) {
       const rect = canvas.getBoundingClientRect();
       const current = new Vec2(e.clientX - rect.left, e.clientY - rect.top);
-      const dx = (current.x - panStart.x) / (100 * editor.scale);
-      const dy = (current.y - panStart.y) / (100 * editor.scale);
-      editor.viewOffset.x = panOffset.x - dx;
-      editor.viewOffset.y = panOffset.y - dy;
+  const dx = (current.x - panStart.x) / (100 * editor.scale);
+  const dy = (current.y - panStart.y) / (100 * editor.scale);
+  editor.viewOffset.x = panOffset.x - dx;
+  editor.viewOffset.y = panOffset.y - dy;
       editor.render(ctx, canvas.width, canvas.height);
       updateOverlayLocal(screenToWorldLocal(current));
     }
@@ -361,44 +377,28 @@ export function initCanvasUI() {
   editor.addNode('number', centerWorld.x, centerWorld.y);
 
   // Sincronizar isDragging con selección
-  function updateDraggingState() {
-    isDragging = false;
-    for (const node of editor.nodes) {
-      if (node.selected && node.draggable) {
-        isDragging = true;
-        break;
-      }
-    }
-  }
+  // OBSOLETO: Esta función ya no se usa, el dragging se maneja en CanvasEvents
+  // function updateDraggingState() {
+  //   isDragging = false;
+  //   for (const node of editor.nodes) {
+  //     if (node.selected) {
+  //       isDragging = true;
+  //       break;
+  //     }
+  //   }
+  // }
 
   // Llamar a updateDraggingState en cada frame
   function loop(time: number) {
     const deltaTime = time - lastTime;
     lastTime = time;
     updateInput();
-    updateDraggingState();
+    // updateDraggingState(); // OBSOLETO: ya no se usa
     editor.update(inpt, deltaTime);
     editor.render(ctx, canvas.width, canvas.height);
     
-    // Dibujar ejes coordenados
-    const origin = worldToScreenLocal(new Vec2(0, 0));
-    const axisLength = 1000; // Longitud de los ejes en píxeles
+    // Los ejes ya se dibujan en NodeEditor.render(), no duplicar aquí
     
-    // Eje X (verde)
-    ctx.beginPath();
-    ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
-    ctx.lineWidth = 1;
-    ctx.moveTo(origin.x - axisLength, origin.y);
-    ctx.lineTo(origin.x + axisLength, origin.y);
-    ctx.stroke();
-    
-    // Eje Y (rojo)
-    ctx.beginPath();
-    ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
-    ctx.lineWidth = 1;
-    ctx.moveTo(origin.x, origin.y - axisLength);
-    ctx.lineTo(origin.x, origin.y + axisLength);
-    ctx.stroke();
     // Resaltar nodos seleccionados
     for (const node of selection.selectedNodes) {
   const pos = worldToScreenLocal(node.pos);

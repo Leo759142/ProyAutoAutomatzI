@@ -182,5 +182,213 @@ export const NodeTypes: { [key: string]: NodeDefinition } = {
             mode: PinMode.Output
         }],
         compute: (inputs: any[]) => [inputs[0] === inputs[1]]
+    },
+
+    // ===== NODOS MATEMÁTICOS =====
+    "add": {
+        type: "add",
+        category: "math",
+        title: "Add (+)",
+        inputs: [
+            {
+                name: "A",
+                type: PinType.Number,
+                mode: PinMode.Input,
+                defaultValue: 0
+            },
+            {
+                name: "B",
+                type: PinType.Number,
+                mode: PinMode.Input,
+                defaultValue: 0
+            }
+        ],
+        outputs: [{
+            name: "result",
+            type: PinType.Number,
+            mode: PinMode.Output
+        }],
+        compute: (inputs: any[]) => [(inputs[0] ?? 0) + (inputs[1] ?? 0)]
+    },
+
+    "subtract": {
+        type: "subtract",
+        category: "math",
+        title: "Subtract (-)",
+        inputs: [
+            {
+                name: "A",
+                type: PinType.Number,
+                mode: PinMode.Input,
+                defaultValue: 0
+            },
+            {
+                name: "B",
+                type: PinType.Number,
+                mode: PinMode.Input,
+                defaultValue: 0
+            }
+        ],
+        outputs: [{
+            name: "result",
+            type: PinType.Number,
+            mode: PinMode.Output
+        }],
+        compute: (inputs: any[]) => [(inputs[0] ?? 0) - (inputs[1] ?? 0)]
+    },
+
+    "multiply": {
+        type: "multiply",
+        category: "math",
+        title: "Multiply (×)",
+        inputs: [
+            {
+                name: "A",
+                type: PinType.Number,
+                mode: PinMode.Input,
+                defaultValue: 1
+            },
+            {
+                name: "B",
+                type: PinType.Number,
+                mode: PinMode.Input,
+                defaultValue: 1
+            }
+        ],
+        outputs: [{
+            name: "result",
+            type: PinType.Number,
+            mode: PinMode.Output
+        }],
+        compute: (inputs: any[]) => [(inputs[0] ?? 1) * (inputs[1] ?? 1)]
+    },
+
+    "divide": {
+        type: "divide",
+        category: "math",
+        title: "Divide (÷)",
+        inputs: [
+            {
+                name: "A",
+                type: PinType.Number,
+                mode: PinMode.Input,
+                defaultValue: 1
+            },
+            {
+                name: "B",
+                type: PinType.Number,
+                mode: PinMode.Input,
+                defaultValue: 1
+            }
+        ],
+        outputs: [{
+            name: "result",
+            type: PinType.Number,
+            mode: PinMode.Output
+        }],
+        compute: (inputs: any[]) => {
+            const a = inputs[0] ?? 1;
+            const b = inputs[1] ?? 1;
+            return [b !== 0 ? a / b : 0]; // Evitar división por cero
+        }
+    },
+
+    "modulo": {
+        type: "modulo",
+        category: "math",
+        title: "Modulo (%)",
+        inputs: [
+            {
+                name: "A",
+                type: PinType.Number,
+                mode: PinMode.Input,
+                defaultValue: 0
+            },
+            {
+                name: "B",
+                type: PinType.Number,
+                mode: PinMode.Input,
+                defaultValue: 1
+            }
+        ],
+        outputs: [{
+            name: "result",
+            type: PinType.Number,
+            mode: PinMode.Output
+        }],
+        compute: (inputs: any[]) => {
+            const a = inputs[0] ?? 0;
+            const b = inputs[1] ?? 1;
+            return [b !== 0 ? a % b : 0]; // Evitar módulo por cero
+        }
+    },
+
+    // ===== NODOS DE STRINGS =====
+    "string": {
+        type: "string",
+        category: "input",
+        title: "String",
+        inputs: [],
+        outputs: [{
+            name: "value",
+            type: PinType.Custom,
+            mode: PinMode.Output,
+            defaultValue: "Hello"
+        }],
+        compute: (inputs: any[], node: any) => {
+            // Mantener el valor actual del output, no sobrescribir
+            return [node.outputs[0].value];
+        }
+    },
+
+    "concat": {
+        type: "concat",
+        category: "string",
+        title: "Concat",
+        inputs: [
+            {
+                name: "A",
+                type: PinType.Custom,
+                mode: PinMode.Input,
+                defaultValue: ""
+            },
+            {
+                name: "B",
+                type: PinType.Custom,
+                mode: PinMode.Input,
+                defaultValue: ""
+            }
+        ],
+        outputs: [{
+            name: "result",
+            type: PinType.Custom,
+            mode: PinMode.Output
+        }],
+        compute: (inputs: any[]) => {
+            const a = inputs[0] ?? "";
+            const b = inputs[1] ?? "";
+            return [a.toString() + b.toString()];
+        }
+    },
+
+    "length": {
+        type: "length",
+        category: "string",
+        title: "Length",
+        inputs: [{
+            name: "text",
+            type: PinType.Custom,
+            mode: PinMode.Input,
+            defaultValue: ""
+        }],
+        outputs: [{
+            name: "length",
+            type: PinType.Number,
+            mode: PinMode.Output
+        }],
+        compute: (inputs: any[]) => {
+            const text = inputs[0] ?? "";
+            return [text.toString().length];
+        }
     }
 };

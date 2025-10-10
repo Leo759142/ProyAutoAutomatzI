@@ -1,11 +1,12 @@
+// ARCHIVO OBSOLETO - No se usa en el proyecto
+// La funcionalidad de procesamiento está integrada en Node.ts
+
 import { Node } from '../Node';
+import { NodeDefinition } from '../../types/types';
 
 export class ProcessNode extends Node {
-  constructor(definition) {
+  constructor(definition: NodeDefinition) {
     super(definition);
   }
-  compute() {
-    // Ejemplo: multiplicar por 2
-    this.outputs[0].value = (this.inputs[0].value ?? 0) * 2;
-  }
+  // compute() ya está implementado en la clase base Node
 }

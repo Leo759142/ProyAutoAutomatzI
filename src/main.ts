@@ -58,6 +58,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const nodeTypeSelect = document.getElementById('nodeTypeSelect') as HTMLSelectElement;
   const templateSelect = document.getElementById('templateSelect') as HTMLSelectElement;
   const loadTemplateBtn = document.getElementById('loadTemplate') as HTMLButtonElement;
+  const helpButton = document.getElementById('helpButton') as HTMLButtonElement;
+  const helpPanel = document.getElementById('helpPanel') as HTMLElement;
 
   if (addNodeBtn) {
     addNodeBtn.addEventListener('click', () => {
@@ -101,8 +103,40 @@ document.addEventListener('DOMContentLoaded', () => {
       stopButton.disabled = true;
       playButton.innerHTML = '<span>▶</span><span>Play</span>';
       playButton.className = 'execution-button play';
+      
+      // Ocultar info de pasos
+      const stepInfo = document.getElementById('stepInfo');
+      if (stepInfo) stepInfo.style.display = 'none';
     });
   }
+
+  // Control de modo de ejecución
+  const executionModeSelect = document.getElementById('executionMode') as HTMLSelectElement;
+  if (executionModeSelect) {
+    executionModeSelect.addEventListener('change', () => {
+      const mode = executionModeSelect.value as 'realtime' | 'step';
+      canvasUI.execution.setExecutionMode(mode);
+      
+      // Mostrar/ocultar info de pasos
+      const stepInfo = document.getElementById('stepInfo');
+      if (stepInfo) {
+        stepInfo.style.display = mode === 'step' ? 'inline-block' : 'none';
+      }
+    });
+  }
+
+  // Actualizar contador de pasos (solo en modo step)
+  setInterval(() => {
+    const executionMode = canvasUI.execution.getExecutionMode();
+    if (executionMode === 'step' && canvasUI.execution.isExecuting()) {
+      const stepCounter = document.getElementById('stepCounter');
+      if (stepCounter) {
+        const current = canvasUI.execution.getCurrentStep();
+        const total = canvasUI.execution.getTotalSteps();
+        stepCounter.textContent = `${current}/${total}`;
+      }
+    }
+  }, 100);
 
   if (loadTemplateBtn && templateSelect) {
     loadTemplateBtn.addEventListener('click', async () => {
@@ -113,5 +147,23 @@ document.addEventListener('DOMContentLoaded', () => {
         canvasUI.editor.loadWorkflowTemplate(template);
       }
     });
+  }
+
+  // Botón de ayuda
+  if (helpButton && helpPanel) {
+    const closeHelp = document.getElementById('closeHelp');
+    
+    helpButton.addEventListener('click', () => {
+      const isVisible = helpPanel.style.display !== 'none';
+      helpPanel.style.display = isVisible ? 'none' : 'block';
+      helpButton.textContent = isVisible ? '❓ Ayuda' : '✖️ Cerrar';
+    });
+    
+    if (closeHelp) {
+      closeHelp.addEventListener('click', () => {
+        helpPanel.style.display = 'none';
+        helpButton.textContent = '❓ Ayuda';
+      });
+    }
   }
 });
