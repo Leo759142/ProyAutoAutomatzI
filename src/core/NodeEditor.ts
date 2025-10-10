@@ -216,10 +216,11 @@ export class NodeEditor {
   }
 
   private updateInteractions(inpt: InputState, currentMouseWorld: Vec2) {
+    // Detectar hover sobre pines
     this.hoveringPin = null;
     for (const node of this.nodes) {
       for (const pin of [...node.inputs, ...node.outputs]) {
-        if (this.distance(currentMouseWorld, pin.pos) < 0.1) {
+        if (this.distance(currentMouseWorld, pin.pos) < 0.15) {
           this.hoveringPin = pin;
           break;
         }
@@ -227,10 +228,14 @@ export class NodeEditor {
       if (this.hoveringPin) break;
     }
 
+    // Iniciar acciones al presionar botón izquierdo
     if (inpt.mouseButtonLeft && !this.lastMouseButtonLeft) {
       if (this.hoveringPin) {
+        // Empezar a arrastrar desde un pin
         this.draggingPin = this.hoveringPin;
+        this.tempLinkEnd = currentMouseWorld;
       } else {
+        // Intentar seleccionar un nodo
         for (const node of this.nodes) {
           if (this.isPointInNode(currentMouseWorld, node)) {
             this.draggingNode = node;
@@ -246,24 +251,50 @@ export class NodeEditor {
       }
     }
 
+    // Actualizar drag de nodo
     if (this.draggingNode && inpt.mouseButtonLeft) {
       const bounds = this.getCanvasBounds();
       this.draggingNode.drag(currentMouseWorld.x, currentMouseWorld.y, bounds);
     }
 
+    // Actualizar línea temporal de conexión
     if (this.draggingPin && inpt.mouseButtonLeft) {
       this.tempLinkEnd = currentMouseWorld;
     }
 
+    // Soltar botón izquierdo
     if (!inpt.mouseButtonLeft && this.lastMouseButtonLeft) {
       if (this.draggingPin) {
+        // Intentar crear conexión
         if (this.hoveringPin && 
             this.hoveringPin !== this.draggingPin && 
             this.hoveringPin.isInput !== this.draggingPin.isInput) {
-          // Verificar tipos compatibles
-          if (this.hoveringPin.type === this.draggingPin.type) {
-            this.onConnect(this.draggingPin, this.hoveringPin);
-            this.computeAll(); // Recalcular valores
+          
+          // Asegurar que from es output y to es input
+          let fromPin = this.draggingPin;
+          let toPin = this.hoveringPin;
+          if (fromPin.isInput) {
+            [fromPin, toPin] = [toPin, fromPin];
+          }
+          
+          // Validar conexión
+          if (this.validateConnection(fromPin, toPin)) {
+            // Eliminar conexión existente en el pin de entrada si existe
+            const existingLinkIndex = this.links.findIndex(link => 
+              link && link[1] === toPin
+            );
+            if (existingLinkIndex >= 0) {
+              const oldLink = this.links[existingLinkIndex];
+              if (oldLink && oldLink[0] && oldLink[1]) {
+                oldLink[0].userData = null;
+                oldLink[1].userData = null;
+              }
+              this.links[existingLinkIndex] = [null, null];
+            }
+            
+            // Crear nueva conexión
+            this.onConnect(fromPin, toPin);
+            this.computeAll(); // Recalcular valores inmediatamente
           }
         } else {
           this.onDrop(currentMouseWorld.x, currentMouseWorld.y, this.draggingPin);
@@ -318,7 +349,7 @@ export class NodeEditor {
 
       // Primero procesar los nodos que conectan a las entradas de este nodo
       this.links.forEach(link => {
-        if (link && link[1] && link[1].parent === node) {
+        if (link && link[0] && link[1] && link[1].parent === node) {
           visit(link[0].parent);
         }
       });
@@ -340,37 +371,39 @@ export class NodeEditor {
   }
 
   computeAll() {
-    // Resetear valores
+    // NO resetear valores de nodos input (number, boolean)
+    // Solo resetear inputs de nodos que reciben conexiones
     this.nodes.forEach(node => {
-      node.inputs.forEach(pin => pin.value = pin.definition.defaultValue);
-      node.outputs.forEach(pin => pin.value = pin.definition.defaultValue);
+      if (node.inputs.length > 0) {
+        node.inputs.forEach(pin => {
+          // Resetear solo si no está conectado
+          const isConnected = this.links.some(link => 
+            link && link[1] === pin
+          );
+          if (!isConnected) {
+            pin.value = pin.definition.defaultValue;
+          }
+        });
+      }
     });
 
     // Obtener orden de ejecución
     const executionOrder = this.findExecutionOrder();
 
-    // Computar nodos en orden (soporte asíncrono)
-    (async () => {
-      for (const node of executionOrder) {
-        // Propagar valores de entrada
-        this.links.forEach(link => {
-          if (link && link[1] && link[1].parent === node) {
-            link[1].value = link[0].value;
-          }
-        });
-
-        // Computar el nodo (soporta async)
-        if (typeof node.compute === 'function') {
-          await node.compute();
+    // Computar nodos en orden SINCRÓNICAMENTE
+    for (const node of executionOrder) {
+      // Propagar valores de entrada ANTES de compute
+      this.links.forEach(link => {
+        if (link && link[0] && link[1] && link[1].parent === node) {
+          link[1].value = link[0].value;
         }
+      });
 
-        // Debug
-        console.log('Computed node:', node.type, {
-          inputs: node.inputs.map(pin => pin.value),
-          outputs: node.outputs.map(pin => pin.value)
-        });
+      // Computar el nodo
+      if (typeof node.compute === 'function') {
+        node.compute();
       }
-    })();
+    }
   }
 
   render(ctx: CanvasRenderingContext2D, width: number, height: number) {

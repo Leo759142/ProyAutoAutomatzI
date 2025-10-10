@@ -87,31 +87,24 @@ export class Node {
     if (this.definition.compute) {
       const inputValues = this.inputs.map(pin => pin.value);
       const outputValues = this.definition.compute(inputValues, this);
-      this.outputs.forEach((pin, index) => {
-        pin.value = outputValues[index];
-      });
+      // Solo actualizar outputs si hay valores retornados
+      if (outputValues && outputValues.length > 0) {
+        this.outputs.forEach((pin, index) => {
+          if (index < outputValues.length && outputValues[index] !== undefined) {
+            pin.value = outputValues[index];
+          }
+        });
+      }
     }
   }
 
   static create(type: string, x: number, y: number): Node | null {
-    // Primero intentamos con el tipo exacto
-    let definition = NodeTypes[type];
+    // Búsqueda directa del tipo
+    const definition = NodeTypes[type];
     
-    // Si no lo encontramos, buscamos en las categorías
-    if (!definition) {
-      // Intentar encontrar el tipo en las diferentes categorías
-      const categories = ['input', 'output', 'math', 'logic', 'data', 'vector'];
-      for (const category of categories) {
-        const categoryType = `${category}/${type}`;
-        if (NodeTypes[categoryType]) {
-          definition = NodeTypes[categoryType];
-          break;
-        }
-      }
-    }
-
     if (!definition) {
       console.warn(`No se encontró definición para el tipo de nodo: ${type}`);
+      console.log('Tipos disponibles:', Object.keys(NodeTypes));
       return null;
     }
 

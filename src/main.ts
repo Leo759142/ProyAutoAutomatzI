@@ -32,30 +32,19 @@ document.addEventListener('DOMContentLoaded', () => {
         templateSelect.remove(1);
       }
       
-      // Añadir templates desde la base de datos agrupados por categoría
+      // Añadir templates desde la base de datos
       const templates = await dbService.listTemplates();
       console.log('Available templates:', templates.length);
-
-      const groups: { [key: string]: HTMLOptGroupElement } = {};
       
       templates.forEach(template => {
         try {
-          const nodesData = JSON.parse(template.nodes_data);
-          const category = nodesData[0]?.type?.split('/')[0] || 'General';
-          
-          if (!groups[category]) {
-            groups[category] = document.createElement('optgroup');
-            groups[category].label = category;
-            templateSelect.appendChild(groups[category]);
-          }
-
           const option = document.createElement('option');
           option.value = template.id?.toString() || '';
           option.textContent = template.name;
           option.title = template.description || '';
-          groups[category].appendChild(option);
+          templateSelect.appendChild(option);
         } catch (error) {
-          console.error('Error parsing template:', template.name, error);
+          console.error('Error adding template:', template.name, error);
         }
       });
     }
@@ -72,18 +61,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (addNodeBtn) {
     addNodeBtn.addEventListener('click', () => {
-      // Get center of canvas in screen coordinates
-      const canvas = document.getElementById('nodeCanvas') as HTMLCanvasElement;
-      const centerScreen = {
-        x: canvas.width / 2,
-        y: canvas.height / 2
-      };
-      // Convert to world coordinates using canvasUI.screenToWorld
-      const centerWorld = canvasUI.screenToWorld(centerScreen);
+      // Get center of canvas in world coordinates (0, 0)
+      const x = canvasUI.editor.viewOffset.x;
+      const y = canvasUI.editor.viewOffset.y;
       if (nodeTypeSelect && nodeTypeSelect.value) {
-        canvasUI.editor.addNode(nodeTypeSelect.value, centerWorld.x, centerWorld.y);
+        canvasUI.editor.addNode(nodeTypeSelect.value, x, y);
       } else {
-        canvasUI.editor.addNode('number', centerWorld.x, centerWorld.y);
+        canvasUI.editor.addNode('number', x, y);
       }
     });
   }

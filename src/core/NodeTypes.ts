@@ -28,9 +28,9 @@ export const NodeTypes: { [key: string]: NodeDefinition } = {
             mode: PinMode.Output,
             defaultValue: 0
         }],
-        compute: (inputs: any[]) => {
-            // Return empty array to prevent overriding the value
-            return [];
+        compute: (inputs: any[], node: any) => {
+            // Mantener el valor actual del output, no sobrescribir
+            return [node.outputs[0].value];
         }
     },
 
@@ -45,7 +45,10 @@ export const NodeTypes: { [key: string]: NodeDefinition } = {
             mode: PinMode.Output,
             defaultValue: false
         }],
-        compute: () => [false]
+        compute: (inputs: any[], node: any) => {
+            // Mantener el valor actual del output, no sobrescribir
+            return [node.outputs[0].value];
+        }
     },
 
     "display": {
