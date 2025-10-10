@@ -43,10 +43,11 @@ export interface PinDefinition {
   defaultValue?: any;
 }
 
+// Interfaz simplificada para INode (evita importación circular)
 export interface INode {
   type: string;
-  inputs: Pin[];
-  outputs: Pin[];
+  inputs: any[]; // Pin[] causaría importación circular
+  outputs: any[]; // Pin[] causaría importación circular
   pos: Vec2;
 }
 

@@ -170,8 +170,8 @@ export function handleMouseUp(manager: any, e: MouseEvent) {
 
 export function handleDblClick(manager: any, e: MouseEvent) {
   // Evento de doble clic: abrir panel de propiedades del nodo
-  e.preventDefault(); // Prevenir comportamiento por defecto
-  e.stopPropagation(); // Evitar propagación
+  e.preventDefault();
+  e.stopPropagation();
   
   const rect = manager.canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
@@ -179,34 +179,51 @@ export function handleDblClick(manager: any, e: MouseEvent) {
   const screenPos = new manager.Vec2(x, y);
   const worldPos = manager.screenToWorld(screenPos);
 
-  console.log('🖱️ Doble-click detectado en:', worldPos);
+  console.log('🖱️ DOBLE-CLICK en pantalla:', { screenX: x, screenY: y });
+  console.log('🌍 Coordenadas mundo:', { worldX: worldPos.x.toFixed(2), worldY: worldPos.y.toFixed(2) });
 
-  // Buscar el nodo bajo el cursor (aumentar radio a 2.0 para mejor detección)
+  // Buscar el nodo bajo el cursor usando detección por rectángulo (más preciso)
   let foundNode = null;
+  let minDistance = Infinity;
+  
   for (const node of manager.editor.nodes) {
-    const dx = worldPos.x - node.pos.x;
-    const dy = worldPos.y - node.pos.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
+    // Usar el tamaño real del nodo para detección de rectángulo
+    const halfWidth = node.size.x / 2;
+    const halfHeight = node.size.y / 2;
     
-    console.log(`  Nodo "${node.title}" en (${node.pos.x.toFixed(2)}, ${node.pos.y.toFixed(2)}), distancia: ${distance.toFixed(2)}`);
+    // Verificar si el click está dentro del rectángulo del nodo
+    const withinX = worldPos.x >= (node.pos.x - halfWidth) && worldPos.x <= (node.pos.x + halfWidth);
+    const withinY = worldPos.y >= (node.pos.y - halfHeight) && worldPos.y <= (node.pos.y + halfHeight);
     
-    // Radio aumentado para mejor detección (2.0 unidades de mundo)
-    if (distance < 2.0) {
-      foundNode = node;
-      break;
+    console.log(`  📦 Nodo "${node.title}" en (${node.pos.x.toFixed(2)}, ${node.pos.y.toFixed(2)}), tamaño: ${node.size.x.toFixed(1)}×${node.size.y.toFixed(1)}`);
+    console.log(`     Límites: X[${(node.pos.x - halfWidth).toFixed(2)} - ${(node.pos.x + halfWidth).toFixed(2)}], Y[${(node.pos.y - halfHeight).toFixed(2)} - ${(node.pos.y + halfHeight).toFixed(2)}]`);
+    console.log(`     Dentro: X=${withinX}, Y=${withinY}`);
+    
+    if (withinX && withinY) {
+      // Calcular distancia al centro para priorizar nodos más cercanos si hay overlapping
+      const dx = worldPos.x - node.pos.x;
+      const dy = worldPos.y - node.pos.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        foundNode = node;
+      }
     }
   }
 
   if (foundNode) {
-    // Nodo encontrado: abrir panel de propiedades
+    console.log('✅ NODO ENCONTRADO:', foundNode.title);
     if (manager.propertiesPanel) {
       manager.propertiesPanel.show(foundNode);
-      console.log('✅ Abriendo propiedades de:', foundNode.title);
+      console.log('📝 Panel de propiedades abierto');
     } else {
-      console.error('❌ propertiesPanel no existe en manager');
+      console.error('❌ ERROR: propertiesPanel no existe en manager');
+      console.log('Manager keys:', Object.keys(manager));
     }
   } else {
     console.log('❌ No se encontró ningún nodo en esta posición');
+    console.log(`   Total nodos en canvas: ${manager.editor.nodes.length}`);
   }
 }
 
