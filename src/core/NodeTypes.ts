@@ -73,25 +73,13 @@ export const NodeTypes: { [key: string]: NodeDefinition } = {
                 name: "A",
                 type: PinType.Boolean,
                 mode: PinMode.Input,
-                defaultValue: true
+                defaultValue: false
             },
             {
                 name: "B",
                 type: PinType.Boolean,
                 mode: PinMode.Input,
-                defaultValue: true
-            },
-            {
-                name: "C",
-                type: PinType.Boolean,
-                mode: PinMode.Input,
-                defaultValue: true
-            },
-            {
-                name: "D",
-                type: PinType.Boolean,
-                mode: PinMode.Input,
-                defaultValue: true
+                defaultValue: false
             }
         ],
         outputs: [{
@@ -100,9 +88,11 @@ export const NodeTypes: { [key: string]: NodeDefinition } = {
             mode: PinMode.Output
         }],
         compute: (inputs: any[]) => {
-            // AND lógico: todos deben ser true
-            // defaultValue=true para que inputs no conectados no afecten (true AND x = x)
-            return [inputs.every(val => val ?? true)];
+            // Soporta inputs dinámicos: si hay más de 2, evalúa todos con AND
+            if (inputs.length > 2) {
+                return [inputs.every(val => val ?? false)];
+            }
+            return [inputs[0] && inputs[1]];
         }
     },
 
@@ -122,18 +112,6 @@ export const NodeTypes: { [key: string]: NodeDefinition } = {
                 type: PinType.Boolean,
                 mode: PinMode.Input,
                 defaultValue: false
-            },
-            {
-                name: "C",
-                type: PinType.Boolean,
-                mode: PinMode.Input,
-                defaultValue: false
-            },
-            {
-                name: "D",
-                type: PinType.Boolean,
-                mode: PinMode.Input,
-                defaultValue: false
             }
         ],
         outputs: [{
@@ -142,9 +120,11 @@ export const NodeTypes: { [key: string]: NodeDefinition } = {
             mode: PinMode.Output
         }],
         compute: (inputs: any[]) => {
-            // OR lógico: al menos uno debe ser true
-            // defaultValue=false para que inputs no conectados no afecten (false OR x = x)
-            return [inputs.some(val => val ?? false)];
+            // Soporta inputs dinámicos: si hay más de 2, evalúa todos con OR
+            if (inputs.length > 2) {
+                return [inputs.some(val => val ?? false)];
+            }
+            return [inputs[0] || inputs[1]];
         }
     },
 
@@ -233,24 +213,6 @@ export const NodeTypes: { [key: string]: NodeDefinition } = {
                 type: PinType.Number,
                 mode: PinMode.Input,
                 defaultValue: 0
-            },
-            {
-                name: "C",
-                type: PinType.Number,
-                mode: PinMode.Input,
-                defaultValue: 0
-            },
-            {
-                name: "D",
-                type: PinType.Number,
-                mode: PinMode.Input,
-                defaultValue: 0
-            },
-            {
-                name: "E",
-                type: PinType.Number,
-                mode: PinMode.Input,
-                defaultValue: 0
             }
         ],
         outputs: [{
@@ -259,8 +221,11 @@ export const NodeTypes: { [key: string]: NodeDefinition } = {
             mode: PinMode.Output
         }],
         compute: (inputs: any[]) => {
-            // Sumar todos los inputs, inputs no conectados usan defaultValue (0)
-            return [inputs.reduce((sum, val) => sum + (val ?? 0), 0)];
+            // Soporta inputs dinámicos: si hay más de 2, los suma todos
+            if (inputs.length > 2) {
+                return [inputs.reduce((sum, val) => sum + (val ?? 0), 0)];
+            }
+            return [(inputs[0] ?? 0) + (inputs[1] ?? 0)];
         }
     },
 
@@ -306,24 +271,6 @@ export const NodeTypes: { [key: string]: NodeDefinition } = {
                 type: PinType.Number,
                 mode: PinMode.Input,
                 defaultValue: 1
-            },
-            {
-                name: "C",
-                type: PinType.Number,
-                mode: PinMode.Input,
-                defaultValue: 1
-            },
-            {
-                name: "D",
-                type: PinType.Number,
-                mode: PinMode.Input,
-                defaultValue: 1
-            },
-            {
-                name: "E",
-                type: PinType.Number,
-                mode: PinMode.Input,
-                defaultValue: 1
             }
         ],
         outputs: [{
@@ -332,9 +279,11 @@ export const NodeTypes: { [key: string]: NodeDefinition } = {
             mode: PinMode.Output
         }],
         compute: (inputs: any[]) => {
-            // Multiplicar todos los inputs, inputs no conectados usan defaultValue (1)
-            // Para multiplicación, usar 1 como neutro es correcto (a × 1 = a)
-            return [inputs.reduce((product, val) => product * (val ?? 1), 1)];
+            // Soporta inputs dinámicos: si hay más de 2, los multiplica todos
+            if (inputs.length > 2) {
+                return [inputs.reduce((product, val) => product * (val ?? 1), 1)];
+            }
+            return [(inputs[0] ?? 1) * (inputs[1] ?? 1)];
         }
     },
 
@@ -432,18 +381,6 @@ export const NodeTypes: { [key: string]: NodeDefinition } = {
                 type: PinType.Custom,
                 mode: PinMode.Input,
                 defaultValue: ""
-            },
-            {
-                name: "C",
-                type: PinType.Custom,
-                mode: PinMode.Input,
-                defaultValue: ""
-            },
-            {
-                name: "D",
-                type: PinType.Custom,
-                mode: PinMode.Input,
-                defaultValue: ""
             }
         ],
         outputs: [{
@@ -452,8 +389,13 @@ export const NodeTypes: { [key: string]: NodeDefinition } = {
             mode: PinMode.Output
         }],
         compute: (inputs: any[]) => {
-            // Concatenar todos los inputs, ignorar vacíos
-            return [inputs.map(val => (val ?? "").toString()).join("")];
+            // Soporta inputs dinámicos: si hay más de 2, concatena todos
+            if (inputs.length > 2) {
+                return [inputs.map(val => (val ?? "").toString()).join("")];
+            }
+            const a = inputs[0] ?? "";
+            const b = inputs[1] ?? "";
+            return [a.toString() + b.toString()];
         }
     },
 

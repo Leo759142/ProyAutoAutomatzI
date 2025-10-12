@@ -101,7 +101,38 @@ export class Node {
     }
   }
 
-  static create(type: string, x: number, y: number): Node | null {
+  /**
+   * Añade pins de input adicionales al nodo (para operadores multi-input)
+   * @param count - Número total de inputs que debe tener el nodo
+   */
+  public addExtraInputs(count: number) {
+    const currentInputs = this.inputs.length;
+    if (count <= currentInputs) return; // Ya tiene suficientes
+    
+    // Obtener el último input como plantilla
+    const lastInput = this.definition.inputs[this.definition.inputs.length - 1];
+    if (!lastInput) return;
+    
+    // Nombres de letras para inputs adicionales
+    const letters = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'];
+    
+    // Añadir inputs adicionales
+    for (let i = currentInputs; i < count; i++) {
+      const letterIndex = i - 2; // C es el índice 0 (después de A y B)
+      const newPinDef: PinDefinition = {
+        name: letterIndex < letters.length ? letters[letterIndex] : `In${i}`,
+        type: lastInput.type,
+        mode: PinMode.Input,
+        defaultValue: lastInput.defaultValue
+      };
+      this.inputs.push(new Pin(this, newPinDef, i));
+    }
+    
+    // Ajustar tamaño del nodo
+    this.size = new Vec2(3.5, Math.max(2.0, Math.max(this.inputs.length, this.outputs.length) * 1.0));
+  }
+
+  static create(type: string, x: number, y: number, extraInputs?: number): Node | null {
     // Búsqueda directa del tipo
     const definition = NodeTypes[type];
     
@@ -113,6 +144,12 @@ export class Node {
 
     const node = new Node(definition);
     node.setPosition(x, y);
+    
+    // Si se especifican inputs extras, agregarlos
+    if (extraInputs && extraInputs > definition.inputs.length) {
+      node.addExtraInputs(extraInputs);
+    }
+    
     return node;
   }
 }

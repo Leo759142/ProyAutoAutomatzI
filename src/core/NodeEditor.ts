@@ -58,6 +58,19 @@ export class NodeEditor {
 
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
       
+      // PRE-ANÁLISIS: Contar cuántos inputs necesita cada nodo según conexiones
+      const nodeInputCounts: { [key: number]: number } = {};
+      connectionsData.forEach((conn: any) => {
+        const toNodeId = conn.to?.node;
+        const toPinIndex = conn.to?.pin ?? 0;
+        if (toNodeId !== undefined) {
+          // Calcular el máximo índice de pin + 1 para saber cuántos inputs necesita
+          nodeInputCounts[toNodeId] = Math.max(nodeInputCounts[toNodeId] || 0, toPinIndex + 1);
+        }
+      });
+      
+      console.log('🔍 Inputs requeridos por nodo:', nodeInputCounts);
+      
       // FASE 1: Crear todos los nodos
       for (let i = 0; i < nodesData.length; i++) {
         const nodeData = nodesData[i];
@@ -86,7 +99,9 @@ export class NodeEditor {
         
         console.log(`🔍 [${i+1}/${nodesData.length}] Creando nodo ID=${nodeData.id}, tipo="${nodeData.type}", pos=(${absoluteX}, ${absoluteY})`);
         
-        const node = Node.create(nodeData.type, absoluteX, absoluteY);
+        // Determinar cuántos inputs necesita este nodo
+        const requiredInputs = nodeInputCounts[nodeData.id] || 0;
+        const node = Node.create(nodeData.type, absoluteX, absoluteY, requiredInputs);
         
         if (node) {
           // Aplicar datos personalizados al nodo
