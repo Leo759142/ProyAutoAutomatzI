@@ -60,6 +60,7 @@ nav#toolbar {
   gap: var(--spacing-md);
   flex-wrap: wrap;
   overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.15) rgba(0,0,0,0.05);
 }
