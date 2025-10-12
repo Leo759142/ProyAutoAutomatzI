@@ -4,6 +4,7 @@ export interface WorkflowTemplate {
     id?: number;
     name: string;
     description: string;
+    problemDescription?: string; // Descripción general del problema separada
     nodes_data: string;
     connections_data: string;
 }
@@ -49,15 +50,40 @@ export class DatabaseService {
 
             // Intentar cargar datos existentes de LocalStorage
             const savedData = localStorage.getItem('workflowDb');
+            let needsMigration = false;
+            
             if (savedData) {
                 try {
                     const binaryArray = new Uint8Array(savedData.split(',').map(Number));
                     this.db = new SQL.Database(binaryArray);
+                    
+                    // Verificar si el schema es correcto
+                    try {
+                        const schemaCheck = this.db.exec('PRAGMA table_info(workflow_templates)');
+                        if (schemaCheck.length > 0) {
+                            const columns = schemaCheck[0].values.map((row: any) => row[1]);
+                            if (!columns.includes('problem_description')) {
+                                console.warn('⚠️ Schema antiguo detectado. Necesita migración.');
+                                needsMigration = true;
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Error verificando schema:', e);
+                        needsMigration = true;
+                    }
                 } catch (e) {
                     console.warn('Error loading from localStorage, creating new DB');
                     this.db = new SQL.Database();
+                    needsMigration = false; // Nueva DB, no necesita migración
                 }
             } else {
+                this.db = new SQL.Database();
+            }
+
+            // Si necesita migración, recrear la base de datos
+            if (needsMigration) {
+                console.log('🔄 Migrando base de datos al nuevo schema...');
+                localStorage.removeItem('workflowDb');
                 this.db = new SQL.Database();
             }
 
@@ -67,6 +93,7 @@ export class DatabaseService {
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
                     description TEXT,
+                    problem_description TEXT,
                     nodes_data TEXT,
                     connections_data TEXT,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -95,9 +122,9 @@ export class DatabaseService {
         if (!this.db) throw new Error('Database not initialized');
         
         const result = this.db.run(
-            `INSERT INTO workflow_templates (name, description, nodes_data, connections_data) 
-             VALUES (?, ?, ?, ?)`,
-            [template.name, template.description, template.nodes_data, template.connections_data]
+            `INSERT INTO workflow_templates (name, description, problem_description, nodes_data, connections_data) 
+             VALUES (?, ?, ?, ?, ?)`,
+            [template.name, template.description, template.problemDescription || null, template.nodes_data, template.connections_data]
         );
 
         this.saveToLocalStorage();
@@ -119,8 +146,9 @@ export class DatabaseService {
             id: row[0] as number,
             name: row[1] as string,
             description: row[2] as string,
-            nodes_data: row[3] as string,
-            connections_data: row[4] as string
+            problemDescription: row[3] as string || undefined,
+            nodes_data: row[4] as string,
+            connections_data: row[5] as string
         };
     }
 
@@ -137,9 +165,23 @@ export class DatabaseService {
             id: row[0] as number,
             name: row[1] as string,
             description: row[2] as string,
-            nodes_data: row[3] as string,
-            connections_data: row[4] as string
+            problemDescription: row[3] as string || undefined,
+            nodes_data: row[4] as string,
+            connections_data: row[5] as string
         }));
+    }
+
+    async updateTemplate(id: number, template: Omit<WorkflowTemplate, 'id'>) {
+        if (!this.db) throw new Error('Database not initialized');
+        
+        this.db.run(
+            `UPDATE workflow_templates 
+             SET name = ?, description = ?, problem_description = ?, nodes_data = ?, connections_data = ? 
+             WHERE id = ?`,
+            [template.name, template.description, template.problemDescription || '', 
+             template.nodes_data, template.connections_data, id]
+        );
+        this.saveToLocalStorage();
     }
 
     async deleteTemplate(id: number) {

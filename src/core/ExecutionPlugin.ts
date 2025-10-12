@@ -34,7 +34,7 @@ export interface ExecutionContext {
   iteration: number;
   startTime: number;
   nodeExecutionCount: Map<any, number>;
-  executionMode: 'realtime' | 'step';
+  executionMode: 'realtime' | 'step' | 'parallel';
   customData: Map<string, any>;
   
   // Utilidades

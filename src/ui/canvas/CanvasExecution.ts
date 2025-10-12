@@ -2,7 +2,7 @@
 // Controles de ejecución: play, pause, stop con simulación paso a paso
 import { NodeEditor } from '../../core/NodeEditor';
 
-export type ExecutionMode = 'realtime' | 'step';
+export type ExecutionMode = 'realtime' | 'step' | 'parallel';
 
 export class CanvasExecution {
   private editor: NodeEditor;
@@ -39,7 +39,9 @@ export class CanvasExecution {
     this.currentStepIndex = 0;
     
     if (this.executionMode === 'step') {
+      // Obtener orden de ejecución (ahora incluye TODAS las componentes conexas)
       this.executionOrder = this.editor.findExecutionOrder();
+      console.log(`📝 Modo Paso a Paso: ${this.executionOrder.length} nodos a ejecutar`);
       this.executeNextStep();
     } else {
       // Modo tiempo real (original)
@@ -53,7 +55,7 @@ export class CanvasExecution {
     }
   }
 
-  private executeNextStep() {
+  private async executeNextStep() {
     if (!this.editor.isRunning || this.executionPaused) return;
     
     if (this.currentStepIndex < this.executionOrder.length) {
@@ -62,8 +64,8 @@ export class CanvasExecution {
       // Resaltar el nodo actual
       this.highlightNode(node);
       
-      // Ejecutar solo este nodo
-      this.editor.computeSingleNode(node);
+      // ✅ MEJORA: Ejecutar con await para asincronicidad correcta
+      await this.editor.computeSingleNode(node);
       
       this.currentStepIndex++;
       
@@ -72,9 +74,14 @@ export class CanvasExecution {
         this.executeNextStep();
       }, 1000);
     } else {
-      // Reiniciar el ciclo
-      this.currentStepIndex = 0;
-      this.executeNextStep();
+      // ✅ MEJORA: No reiniciar automáticamente, detener ejecución
+      console.log('✅ Ejecución paso a paso completada');
+      this.stopExecution();
+      // Opcional: Notificar al usuario que terminó
+      const stepCounter = document.getElementById('stepCounter');
+      if (stepCounter) {
+        stepCounter.textContent = `${this.executionOrder.length}/${this.executionOrder.length} ✓`;
+      }
     }
   }
 

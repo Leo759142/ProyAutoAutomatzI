@@ -41,6 +41,10 @@ export class Node {
   public highlightUntil: number = 0;
   // Highlight para ejecución paso a paso
   public stepHighlight: boolean = false;
+  // Título personalizado editable por el usuario
+  public customTitle: string | null = null;
+  // Descripción personalizada editable por el usuario
+  public customDescription: string | null = null;
 
   constructor(private definition: NodeDefinition) {
   // Tamaño base aumentado para mejor visibilidad
@@ -79,7 +83,17 @@ export class Node {
   }
 
   get title(): string {
-    return this.definition.title;
+    // Si hay un título personalizado, usarlo; sino, usar el del template
+    return this.customTitle !== null ? this.customTitle : this.definition.title;
+  }
+
+  get subtitle(): string | undefined {
+    return this.definition.subtitle;
+  }
+
+  get description(): string | undefined {
+    // Si hay una descripción personalizada, usarla; sino, usar la del template
+    return this.customDescription !== null ? this.customDescription : this.definition.description;
   }
 
   get type(): string {

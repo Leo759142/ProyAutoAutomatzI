@@ -4,7 +4,9 @@ export const NodeTypes: { [key: string]: NodeDefinition } = {
     "condition": {
         type: "condition",
         category: "logic",
-        title: "Condition (>10)",
+        title: "Condition",
+        subtitle: ">10",
+        description: "Evalúa si el valor de entrada es mayor que 10",
         inputs: [{
             name: "value",
             type: PinType.Number,
@@ -21,6 +23,8 @@ export const NodeTypes: { [key: string]: NodeDefinition } = {
         type: "number",
         category: "input",
         title: "Number",
+        subtitle: "Constant",
+        description: "Produce un valor numérico constante configurable",
         inputs: [],
         outputs: [{
             name: "value",
@@ -68,6 +72,8 @@ export const NodeTypes: { [key: string]: NodeDefinition } = {
         type: "and",
         category: "logic",
         title: "AND",
+        subtitle: "Logic Gate",
+        description: "Operación lógica AND: retorna true solo si todas las entradas son true",
         inputs: [
             {
                 name: "A",
@@ -200,7 +206,9 @@ export const NodeTypes: { [key: string]: NodeDefinition } = {
     "add": {
         type: "add",
         category: "math",
-        title: "Add (+)",
+        title: "Add",
+        subtitle: "A + B",
+        description: "Suma dos o más números. Soporta entradas dinámicas para operaciones múltiples.",
         inputs: [
             {
                 name: "A",
@@ -232,7 +240,9 @@ export const NodeTypes: { [key: string]: NodeDefinition } = {
     "subtract": {
         type: "subtract",
         category: "math",
-        title: "Subtract (-)",
+        title: "Subtract",
+        subtitle: "A - B",
+        description: "Resta el segundo número del primero (A - B).",
         inputs: [
             {
                 name: "A",
@@ -258,7 +268,9 @@ export const NodeTypes: { [key: string]: NodeDefinition } = {
     "multiply": {
         type: "multiply",
         category: "math",
-        title: "Multiply (×)",
+        title: "Multiply",
+        subtitle: "A × B",
+        description: "Multiplica dos o más números. Soporta entradas dinámicas.",
         inputs: [
             {
                 name: "A",
@@ -484,5 +496,43 @@ export const NodeTypes: { [key: string]: NodeDefinition } = {
             const text = inputs[0] ?? "";
             return [text.toString().length];
         }
+    },
+
+    // ==================== NODOS ESPECIALES PERT/CPM ====================
+    "task": {
+        type: "task",
+        category: "pert",
+        title: "Task",
+        subtitle: "Activity",
+        description: "Nodo de tarea/actividad para PERT/CPM. La duración se configura en el output 'duration'",
+        inputs: [
+            {
+                name: "predecessor",
+                type: PinType.Number,
+                mode: PinMode.Input,
+                defaultValue: 0
+            }
+        ],
+        outputs: [{
+            name: "duration",
+            type: PinType.Number,
+            mode: PinMode.Output,
+            defaultValue: 1
+        }],
+        compute: (inputs: any[], node: any) => {
+            // La duración se mantiene del valor configurado
+            return [node.outputs[0].value];
+        }
+    },
+
+    "info-panel": {
+        type: "info-panel",
+        category: "info",
+        title: "Info Panel",
+        subtitle: "Description",
+        description: "Panel de información que muestra la descripción del problema. NO participa en el grafo de ejecución",
+        inputs: [],
+        outputs: [],
+        compute: () => []
     }
 };

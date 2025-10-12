@@ -60,16 +60,39 @@ export function handleMouseMove(manager: any, e: MouseEvent) {
   manager.inpt.mousePos.x = x;
   manager.inpt.mousePos.y = y;
   if (!manager.selection.isSelecting) {
-    let isOverNode = false;
+    // Verificar si está sobre un pin primero
+    let isOverPin = false;
+    const PIN_HOVER_RADIUS = 0.3;
+    
     for (const node of manager.editor.nodes) {
-      const dx = worldPos.x - node.pos.x;
-      const dy = worldPos.y - node.pos.y;
-      if (Math.sqrt(dx * dx + dy * dy) < 0.2) {
-        isOverNode = true;
-        break;
+      for (const pin of [...node.inputs, ...node.outputs]) {
+        const dx = worldPos.x - pin.pos.x;
+        const dy = worldPos.y - pin.pos.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < PIN_HOVER_RADIUS) {
+          isOverPin = true;
+          // Cambiar cursor para indicar que se puede hacer clic
+          const hasConnection = pin.userData !== null && pin.userData !== undefined;
+          manager.canvas.style.cursor = hasConnection ? 'not-allowed' : 'crosshair';
+          break;
+        }
       }
+      if (isOverPin) break;
     }
-    manager.canvas.style.cursor = isOverNode ? 'pointer' : 'default';
+    
+    if (!isOverPin) {
+      // Si no está sobre un pin, verificar nodos
+      let isOverNode = false;
+      for (const node of manager.editor.nodes) {
+        const dx = worldPos.x - node.pos.x;
+        const dy = worldPos.y - node.pos.y;
+        if (Math.sqrt(dx * dx + dy * dy) < 0.2) {
+          isOverNode = true;
+          break;
+        }
+      }
+      manager.canvas.style.cursor = isOverNode ? 'pointer' : 'default';
+    }
   }
   manager.updateOverlay(manager.inpt.mousePos);
 }
@@ -217,30 +240,91 @@ export function handleMouseDown(manager: any, e: MouseEvent) {
     manager.lastPanPoint.y = y;
     manager.canvas.style.cursor = 'grabbing';
   } else if (e.button === 2) {
-    // Click derecho: intentar eliminar conexión
+    // Click derecho: primero verificar si es en un PIN
+    let clickedPin = null;
+    const PIN_CLICK_RADIUS = 0.3;
+    
+    for (const node of manager.editor.nodes) {
+      for (const pin of [...node.inputs, ...node.outputs]) {
+        const dx = worldPos.x - pin.pos.x;
+        const dy = worldPos.y - pin.pos.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < PIN_CLICK_RADIUS) {
+          clickedPin = pin;
+          break;
+        }
+      }
+      if (clickedPin) break;
+    }
+    
+    if (clickedPin) {
+      // Click derecho en PIN: eliminar TODAS las conexiones de ese pin
+      const linkIndex = clickedPin.userData;
+      if (linkIndex !== null && linkIndex !== undefined && manager.editor.links[linkIndex]) {
+        const [fromPin, toPin] = manager.editor.links[linkIndex];
+        console.log(`🗑️ Click derecho en PIN: Eliminando conexión ${fromPin.parent.title}.${fromPin.name} → ${toPin.parent.title}.${toPin.name}`);
+        
+        // Limpiar userData de ambos pines
+        if (fromPin) fromPin.userData = null;
+        if (toPin) toPin.userData = null;
+        
+        // Eliminar el link
+        manager.editor.links[linkIndex] = null;
+        
+        // Recomputar
+        manager.editor.computeAll();
+        
+        // Mostrar mensaje visual
+        const logAudit = (window as any).logAudit;
+        if (logAudit) {
+          logAudit(`🗑️ Conexión eliminada: ${fromPin.parent.title}.${fromPin.name} → ${toPin.parent.title}.${toPin.name}`);
+        }
+        
+        e.preventDefault();
+        return;
+      } else {
+        console.log('ℹ️ Este pin no tiene conexiones para eliminar');
+        const logAudit = (window as any).logAudit;
+        if (logAudit) {
+          logAudit(`ℹ️ Pin ${clickedPin.name} no tiene conexiones`);
+        }
+        e.preventDefault();
+        return;
+      }
+    }
+    
+    // Si no es en pin, intentar eliminar conexión por proximidad al link
     const { getClosestLink } = require('./CanvasUtils');
     const closestLink = getClosestLink(worldPos, manager.editor.links, 0.3);
-    
     if (closestLink) {
       const [fromPin, toPin] = closestLink.link;
       const linkIndex = closestLink.index;
-      
-      console.log(`🗑️ Click derecho: Eliminando conexión ${fromPin.parent.title}.${fromPin.name} → ${toPin.parent.title}.${toPin.name}`);
-      
-      // Limpiar userData de ambos pins
+      console.log(`🗑️ Click derecho en línea: Eliminando conexión ${fromPin.parent.title}.${fromPin.name} → ${toPin.parent.title}.${toPin.name}`);
       if (fromPin) fromPin.userData = null;
       if (toPin) toPin.userData = null;
-      
-      // Eliminar link
       manager.editor.links[linkIndex] = null;
-      
-      // Recalcular valores
       manager.editor.computeAll();
-      
       e.preventDefault();
       return;
     }
-    
+    // Si no hay link, ni nodo ni pin, deseleccionar todo
+    let clickedNode = null;
+    for (const node of manager.editor.nodes) {
+      const dx = worldPos.x - node.pos.x;
+      const dy = worldPos.y - node.pos.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance < 0.2) {
+        clickedNode = node;
+        break;
+      }
+    }
+    if (!clickedNode) {
+      manager.selection.selectedNodes.clear();
+      manager.selection.isMovingSelection = false;
+      manager.selection.nodeOffsets.clear();
+      manager.canvas.style.cursor = 'default';
+      console.log('🖱️ Click derecho en canvas vacío: deselección total');
+    }
     manager.inpt.mouseButtonRight = true;
   }
   e.preventDefault();
