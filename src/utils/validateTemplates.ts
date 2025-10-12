@@ -216,8 +216,122 @@ export function validateAllTemplates(): boolean {
   return allValid;
 }
 
+
+// Validar todos los templates desde la base de datos SQL
+import { DatabaseService } from '../services/DatabaseService';
+
+export async function validateAllSqlTemplates(): Promise<boolean> {
+  console.log('\n🔍 ========================================');
+  console.log('🔍 VALIDACIÓN DE TODOS LOS TEMPLATES (SQL)');
+  console.log('🔍 ========================================\n');
+
+  const db = DatabaseService.getInstance();
+  await db.initialize();
+  const sqlTemplates = await db.listTemplates();
+
+  let allValid = true;
+  const results: { name: string; result: ValidationResult }[] = [];
+
+  sqlTemplates.forEach((template, index) => {
+    const result = validateTemplate(template, index);
+    results.push({ name: template.name, result });
+    if (!result.valid) {
+      allValid = false;
+    }
+  });
+
+  console.log('\n📊 ========================================');
+  console.log('📊 RESUMEN DE VALIDACIÓN (SQL)');
+  console.log('📊 ========================================\n');
+  console.log(`Total de templates: ${results.length}`);
+  console.log(`✅ Válidos: ${results.filter(r => r.result.valid).length}`);
+  console.log(`❌ Inválidos: ${results.filter(r => !r.result.valid).length}`);
+
+  if (!allValid) {
+    console.log('\n❌ TEMPLATES INVÁLIDOS:');
+    results
+      .filter(r => !r.result.valid)
+      .forEach(r => {
+        console.log(`  - ${r.name}: ${r.result.errors.length} errores`);
+      });
+  } else {
+    console.log('\n✅ TODOS LOS TEMPLATES SON VÁLIDOS');
+  }
+
+  return allValid;
+}
+
+// Corrección automática de templates SQL inválidos
+export async function autoFixSqlTemplates(): Promise<void> {
+  const db = DatabaseService.getInstance();
+  await db.initialize();
+  const sqlTemplates = await db.listTemplates();
+
+  for (const template of sqlTemplates) {
+    let changed = false;
+    let nodesData: any[];
+    let connectionsData: any[];
+    try {
+      nodesData = JSON.parse(template.nodes_data);
+      connectionsData = JSON.parse(template.connections_data);
+    } catch {
+      continue; // Saltar templates con JSON inválido
+    }
+
+    // IDs únicos
+    const usedIds = new Set<number>();
+    nodesData.forEach((node, i) => {
+      if (!node.id || usedIds.has(node.id)) {
+        node.id = i + 1;
+        changed = true;
+      }
+      usedIds.add(node.id);
+      // Si falta tipo, asignar 'number' por defecto
+      if (!node.type) {
+        node.type = 'number';
+        changed = true;
+      }
+    });
+
+    // Corregir conexiones
+    connectionsData.forEach(conn => {
+      const fromNode = nodesData.find(n => n.id === conn.from.node);
+      const toNode = nodesData.find(n => n.id === conn.to.node);
+      if (!fromNode || !toNode) return;
+      const fromType = NodeTypes[fromNode.type];
+      const toType = NodeTypes[toNode.type];
+      // Ajustar pin de salida
+      if (fromType && conn.from.pin >= fromType.outputs.length) {
+        conn.from.pin = fromType.outputs.length - 1;
+        changed = true;
+      }
+      // Ajustar pin de entrada
+      if (toType && conn.to.pin >= toType.inputs.length) {
+        conn.to.pin = toType.inputs.length - 1;
+        changed = true;
+      }
+      // Tipos incompatibles: si detecta incompatibilidad, lo marca como warning (no corrige tipo)
+    });
+
+    if (changed) {
+      // Actualizar template en la base de datos
+      await db.saveTemplate({
+        ...template,
+        nodes_data: JSON.stringify(nodesData),
+        connections_data: JSON.stringify(connectionsData)
+      });
+      console.log(`✅ Template corregido: ${template.name}`);
+    }
+  }
+  console.log('🛠️ Corrección automática finalizada. Ejecuta validateSqlTemplates() para verificar.');
+}
+
 // Ejecutar validación si se importa este módulo
 if (typeof window !== 'undefined') {
   (window as any).validateTemplates = validateAllTemplates;
-  console.log('💡 Ejecuta validateTemplates() en la consola para validar todos los templates');
+  (window as any).validateSqlTemplates = validateAllSqlTemplates;
+  (window as any).autoFixSqlTemplates = autoFixSqlTemplates;
+  console.log('💡 Ejecuta validateTemplates() para templates por defecto');
+  console.log('💡 Ejecuta validateSqlTemplates() para templates desde SQL');
+  console.log('💡 Ejecuta autoFixSqlTemplates() para corregir templates SQL automáticamente');
 }

@@ -77,10 +77,43 @@ export class PropertiesPanel {
   private renderProperties() {
     if (!this.currentNode) return;
 
-    // Mostrar tipo de nodo
+    // Mostrar título editable
     const nodeTypeDisplay = document.getElementById('nodeTypeDisplay');
     if (nodeTypeDisplay) {
-      nodeTypeDisplay.textContent = this.currentNode.title;
+      // Limpiar y crear input editable para el título
+      nodeTypeDisplay.innerHTML = '';
+      
+      const titleInput = document.createElement('input');
+      titleInput.type = 'text';
+      titleInput.id = 'nodeTitleInput';
+      titleInput.className = 'title-input';
+      titleInput.placeholder = 'Título del nodo';
+      titleInput.value = this.currentNode.title;
+      
+      if (this.currentNode.subtitle) {
+        titleInput.placeholder += ` (${this.currentNode.subtitle})`;
+      }
+      
+      nodeTypeDisplay.appendChild(titleInput);
+    }
+
+    // Mostrar descripción editable
+    const nodeDescriptionGroup = document.getElementById('nodeDescriptionGroup');
+    const nodeDescriptionContainer = document.getElementById('nodeDescription');
+    if (nodeDescriptionContainer && nodeDescriptionGroup) {
+      // Limpiar contenido anterior
+      nodeDescriptionContainer.innerHTML = '';
+      
+      // Crear textarea editable para la descripción
+      const descriptionTextarea = document.createElement('textarea');
+      descriptionTextarea.id = 'nodeDescriptionTextarea';
+      descriptionTextarea.className = 'description-textarea';
+      descriptionTextarea.placeholder = 'Añade una descripción personalizada...';
+      descriptionTextarea.value = this.currentNode.description || '';
+      descriptionTextarea.rows = 3;
+      
+      nodeDescriptionContainer.appendChild(descriptionTextarea);
+      nodeDescriptionGroup.style.display = 'block';
     }
 
     // Contenedor de inputs
@@ -213,6 +246,22 @@ export class PropertiesPanel {
   private applyChanges() {
     if (!this.currentNode) return;
 
+    // Guardar el título personalizado
+    const titleInput = document.getElementById('nodeTitleInput') as HTMLInputElement;
+    if (titleInput) {
+      const newTitle = titleInput.value.trim();
+      // Si está vacío, resetear a null para usar el título por defecto
+      this.currentNode.customTitle = newTitle || null;
+    }
+
+    // Guardar la descripción personalizada
+    const descriptionTextarea = document.getElementById('nodeDescriptionTextarea') as HTMLTextAreaElement;
+    if (descriptionTextarea) {
+      const newDescription = descriptionTextarea.value.trim();
+      // Si está vacío, resetear a null para usar la descripción por defecto
+      this.currentNode.customDescription = newDescription || null;
+    }
+
     if (this.currentNode!.inputs.length === 0 && this.currentNode!.outputs.length > 0) {
       // Editar OUTPUT si no hay inputs
       this.inputElements.forEach((inputElement, pinIndex) => {
@@ -263,6 +312,7 @@ export class PropertiesPanel {
 
     console.log('✅ Propiedades aplicadas:', {
       node: this.currentNode.title,
+      description: this.currentNode.description,
       inputs: this.currentNode.inputs.map(p => ({ name: p.name, value: p.value })),
       outputs: this.currentNode.outputs.map(p => ({ name: p.name, value: p.value }))
     });

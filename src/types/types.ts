@@ -55,6 +55,8 @@ export interface NodeDefinition {
   type: string;
   category: string;
   title: string;
+  subtitle?: string; // Título secundario opcional
+  description?: string; // Descripción del nodo
   inputs: PinDefinition[];
   outputs: PinDefinition[];
   compute?: (inputs: any[], node?: INode) => any[];

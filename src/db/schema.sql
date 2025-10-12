@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS workflow_templates (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     description TEXT,
+    problem_description TEXT, -- Descripción general del problema
     nodes_data TEXT,
     connections_data TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
