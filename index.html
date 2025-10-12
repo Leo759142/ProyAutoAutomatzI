@@ -1,84 +1,103 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Node Editor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="description" content="Editor visual de nodos para flujos de trabajo y diagramas">
+    <title>Node Editor - Visual Workflow</title>
     <link rel="stylesheet" href="/src/style.css">
     <script src="https://sql.js.org/dist/sql-wasm.js"></script>
 </head>
 <body>
     <div id="app">
-        <div id="toolbar">
-            <div class="toolbar-section">
-                <button id="addNode" title="Crear nuevo nodo en el canvas">Add Node (+)</button>
-                <button id="clearCanvas" title="Eliminar todos los nodos">Clear Canvas</button>
+        <nav id="toolbar">
+            <div class="toolbar-group left" aria-label="Acciones principales">
+                <button id="addNode" title="Crear nuevo nodo en el canvas">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="9" y="2" width="2" height="16" rx="1" fill="currentColor"/><rect x="2" y="9" width="16" height="2" rx="1" fill="currentColor"/></svg>
+                    <span>Nodo</span>
+                </button>
+                <button id="clearCanvas" title="Eliminar todos los nodos">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="5" width="12" height="10" rx="2" fill="currentColor"/><rect x="7" y="2" width="6" height="2" rx="1" fill="currentColor"/></svg>
+                    <span>Limpiar</span>
+                </button>
             </div>
-            <div class="toolbar-section execution">
-                <button id="playButton" class="execution-button play" title="EJECUTAR los nodos conectados">
-                    <span>▶</span>
-                    <span>Play</span>
-                </button>
-                <button id="stopButton" class="execution-button stop" disabled title="Detener la ejecución">
-                    <span>⬛</span>
-                    <span>Stop</span>
-                </button>
-                <select id="executionMode" title="Modo de Ejecución: Tiempo Real (100ms) o Paso a Paso (1s)">
-                    <option value="realtime">⚡ Tiempo Real (100ms)</option>
-                    <option value="step">🐌 Paso a Paso (1s)</option>
-                </select>
-                <div id="stepInfo" style="display: none;">
-                    <span id="stepCounter">0/0</span>
+            <div class="toolbar-separator"></div>
+            <div class="toolbar-group center">
+                <div class="toolbar-block">
+                    <button id="playButton" class="execution-button play" title="Ejecutar flujo">
+                        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="5,3 17,10 5,17" fill="currentColor"/></svg>
+                        <span>Play</span>
+                    </button>
+                    <button id="stopButton" class="execution-button stop" disabled title="Detener ejecución">
+                        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="5" width="10" height="10" rx="2" fill="currentColor"/></svg>
+                        <span>Stop</span>
+                    </button>
+                    <select id="executionMode" title="Modo de Ejecución">
+                        <option value="realtime">⚡ Tiempo Real</option>
+                        <option value="step">🐌 Paso a Paso</option>
+                    </select>
+                    <div id="stepInfo" style="display: none;">
+                        <span id="stepCounter">0/0</span>
+                    </div>
+                </div>
+                <div class="toolbar-separator"></div>
+                <div class="toolbar-block">
+                    <select id="nodeTypeSelect" title="Tipo de nodo">
+                        <option value="" disabled selected>🎯 Tipo de nodo</option>
+                        <optgroup label="Input/Output">
+                            <option value="number">Number Input</option>
+                            <option value="boolean">Boolean Input</option>
+                            <option value="display">Display</option>
+                        </optgroup>
+                        <optgroup label="Logic">
+                            <option value="and">AND</option>
+                            <option value="or">OR</option>
+                            <option value="not">NOT</option>
+                        </optgroup>
+                        <optgroup label="Comparison">
+                            <option value="greater">Greater Than</option>
+                            <option value="equals">Equals</option>
+                        </optgroup>
+                        <optgroup label="Math">
+                            <option value="add">Add (+)</option>
+                            <option value="subtract">Subtract (-)</option>
+                            <option value="multiply">Multiply (×)</option>
+                            <option value="divide">Divide (÷)</option>
+                            <option value="modulo">Modulo (%)</option>
+                        </optgroup>
+                        <optgroup label="String">
+                            <option value="string">String Input</option>
+                            <option value="concat">Concatenate</option>
+                            <option value="length">Length</option>
+                        </optgroup>
+                    </select>
+                </div>
+                <div class="toolbar-separator"></div>
+                <div class="toolbar-block">
+                    <select id="templateSelect" title="Templates de ejemplo listos para usar">
+                        <option value="">📁 Template</option>
+                    </select>
+                    <button id="loadTemplate" title="Cargar el template seleccionado">
+                        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="7" width="14" height="10" rx="2" fill="currentColor"/><path d="M10 2v8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 7l3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span>Cargar</span>
+                    </button>
                 </div>
             </div>
-            <div class="toolbar-section node-types">
-                <select id="nodeTypeSelect">
-                    <option value="" disabled selected>🎯 Selecciona tipo de nodo (o presiona 'A')</option>
-                    <optgroup label="Input/Output">
-                        <option value="number">Number Input</option>
-                        <option value="boolean">Boolean Input</option>
-                        <option value="display">Display</option>
-                    </optgroup>
-                    <optgroup label="Logic">
-                        <option value="and">AND</option>
-                        <option value="or">OR</option>
-                        <option value="not">NOT</option>
-                    </optgroup>
-                    <optgroup label="Comparison">
-                        <option value="greater">Greater Than</option>
-                        <option value="equals">Equals</option>
-                    </optgroup>
-                    <optgroup label="Math">
-                        <option value="add">Add (+)</option>
-                        <option value="subtract">Subtract (-)</option>
-                        <option value="multiply">Multiply (×)</option>
-                        <option value="divide">Divide (÷)</option>
-                        <option value="modulo">Modulo (%)</option>
-                    </optgroup>
-                    <optgroup label="String">
-                        <option value="string">String Input</option>
-                        <option value="concat">Concatenate</option>
-                        <option value="length">Length</option>
-                    </optgroup>
-                </select>
+            <div class="toolbar-separator"></div>
+            <div class="toolbar-group right">
+                <button id="helpButton" title="Mostrar/ocultar ayuda">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="2" fill="none"/><text x="10" y="15" text-anchor="middle" font-size="12" fill="currentColor">?</text></svg>
+                    <span>Ayuda</span>
+                </button>
             </div>
-            <div class="toolbar-section">
-                <select id="templateSelect" title="Templates de ejemplo listos para usar">
-                    <option value="">📁 Seleccionar Template</option>
-                </select>
-                <button id="loadTemplate" title="Cargar el template seleccionado">Cargar Template</button>
-            </div>
-            <div class="toolbar-section help">
-                <button id="helpButton" title="Mostrar/ocultar ayuda">❓ Ayuda</button>
-            </div>
-            <div class="tools">
-                <span>Tools:</span>
-                <span>Press 'A' to add node</span>
-                <span style="color: #FFD54F; font-weight: bold;">🖱️ DOUBLE-CLICK to edit values</span>
-                <span>Middle mouse to pan</span>
-                <span>Mouse wheel to zoom</span>
-                <span>Delete to remove selected</span>
-            </div>
+        </nav>
+        <div class="tools">
+            <span class="tool-label">Herramientas:</span>
+            <span class="tool-item"><kbd>A</kbd> Añadir nodo</span>
+            <span class="tool-item tool-highlight">🖱️ <strong>DOBLE-CLICK</strong> para editar</span>
+            <span class="tool-item">🖱️ Click medio para mover</span>
+            <span class="tool-item">🖱️ Rueda para zoom</span>
+            <span class="tool-item"><kbd>Delete</kbd> Eliminar</span>
         </div>
         <canvas id="nodeCanvas"></canvas>
         

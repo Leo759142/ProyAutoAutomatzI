@@ -11,18 +11,39 @@ document.addEventListener('DOMContentLoaded', () => {
   // Inicializar base de datos y guardar templates por defecto
   const dbService = DatabaseService.getInstance();
   dbService.initialize().then(async () => {
-    const templates = await dbService.listTemplates();
-    if (templates.length === 0) {
-      console.log('Loading default templates...');
-      try {
-        for (const template of defaultTemplates) {
-          await dbService.saveTemplate(template);
+    const existingTemplates = await dbService.listTemplates();
+    const existingNames = existingTemplates.map(t => t.name);
+    
+    console.log('Existing templates:', existingNames);
+    console.log('Available default templates:', defaultTemplates.map(t => t.name));
+    
+    // 🔧 FORZAR ACTUALIZACIÓN: Eliminar templates por defecto existentes para recargarlos
+    console.log('🔄 Actualizando templates por defecto...');
+    for (const existing of existingTemplates) {
+      const isDefaultTemplate = defaultTemplates.some(t => t.name === existing.name);
+      if (isDefaultTemplate && existing.id) {
+        try {
+          await dbService.deleteTemplate(existing.id);
+          console.log(`🗑️ Eliminado template antiguo: ${existing.name}`);
+        } catch (error) {
+          console.error(`Error eliminando template ${existing.name}:`, error);
         }
-        console.log('Default templates loaded successfully');
-      } catch (error) {
-        console.error('Error loading default templates:', error);
       }
     }
+    
+    // Cargar todos los templates por defecto (ahora con coordenadas corregidas)
+    let addedCount = 0;
+    for (const template of defaultTemplates) {
+      try {
+        await dbService.saveTemplate(template);
+        addedCount++;
+        console.log(`✅ Cargado template: ${template.name}`);
+      } catch (error) {
+        console.error(`Error cargando template ${template.name}:`, error);
+      }
+    }
+    
+    console.log(`✨ ${addedCount} templates actualizados con coordenadas corregidas`)
 
     // Actualizar el select de templates con los datos de la base de datos
     const templateSelect = document.getElementById('templateSelect') as HTMLSelectElement;
@@ -53,6 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Add event listeners for toolbar buttons
   const addNodeBtn = document.getElementById('addNode') as HTMLButtonElement;
   const clearCanvasBtn = document.getElementById('clearCanvas') as HTMLButtonElement;
+  const centerViewBtn = document.getElementById('centerView') as HTMLButtonElement;
   const playButton = document.getElementById('playButton') as HTMLButtonElement;
   const stopButton = document.getElementById('stopButton') as HTMLButtonElement;
   const nodeTypeSelect = document.getElementById('nodeTypeSelect') as HTMLSelectElement;
@@ -77,6 +99,16 @@ document.addEventListener('DOMContentLoaded', () => {
   if (clearCanvasBtn) {
     clearCanvasBtn.addEventListener('click', () => {
       canvasUI.editor.clearCanvas();
+    });
+  }
+
+  if (centerViewBtn) {
+    centerViewBtn.addEventListener('click', () => {
+      // CENTRAR la vista en el origen (0, 0)
+      canvasUI.editor.viewOffset.x = 0;
+      canvasUI.editor.viewOffset.y = 0;
+      canvasUI.editor.scale = 1.0;
+      console.log('🎯 Vista centrada en origen (0,0) con zoom 1.0');
     });
   }
 

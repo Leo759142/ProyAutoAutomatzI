@@ -21,14 +21,11 @@ export function handleMouseMove(manager: any, e: MouseEvent) {
   const y = e.clientY - rect.top;
   const screenPos = new manager.Vec2(x, y);
   const worldPos = manager.screenToWorld(screenPos);
-  if (manager.isPanning) {
-    const dx = (x - manager.lastPanPoint.x) / (manager.canvas.width * 0.5) / manager.editor.scale;
-    const dy = (y - manager.lastPanPoint.y) / (manager.canvas.height * 0.5) / manager.editor.scale;
-    manager.editor.viewOffset.x -= dx;
-    manager.editor.viewOffset.y -= dy;
-    manager.lastPanPoint.x = x;
-    manager.lastPanPoint.y = y;
-  } else if (manager.selection.isMovingSelection && manager.selection.selectedNodes.size > 0) {
+  // No hay necesidad de arrastre temporal - el sistema es de click-click
+
+  // Movimiento de nodos SOLO si hay selección activa (zona azul)
+  if (manager.selection.isMovingSelection && manager.selection.selectedNodes.size > 0) {
+    // Si estamos moviendo nodos, NO permitir panning
     const dx = worldPos.x - manager.selection.selectionMoveStart.x;
     const dy = worldPos.y - manager.selection.selectionMoveStart.y;
     for (const node of manager.selection.selectedNodes) {
@@ -38,21 +35,41 @@ export function handleMouseMove(manager: any, e: MouseEvent) {
         node.pos.y = offset.y + dy;
       }
     }
-  } else {
-    manager.inpt.mousePos.x = x;
-    manager.inpt.mousePos.y = y;
-    if (!manager.selection.isSelecting) {
-      let isOverNode = false;
-      for (const node of manager.editor.nodes) {
-        const dx = worldPos.x - node.pos.x;
-        const dy = worldPos.y - node.pos.y;
-        if (Math.sqrt(dx * dx + dy * dy) < 0.2) {
-          isOverNode = true;
-          break;
-        }
+    return;
+  }
+
+  // El sistema de conexiones ya no interfiere con el panning
+
+  // Panning SOLO con botón central y si NO estamos moviendo nodos NI creando conexiones
+  if (manager.isPanning && manager.inpt.mouseButtonMiddle && 
+      !(manager.selection.isMovingSelection && manager.selection.selectedNodes.size > 0)) {
+    // Sistema simplificado: 1 píxel = 1 unidad
+    const dx = (x - manager.lastPanPoint.x) / manager.editor.scale;
+    const dy = (y - manager.lastPanPoint.y) / manager.editor.scale;
+    manager.editor.viewOffset.x -= dx;
+    manager.editor.viewOffset.y -= dy;
+    const MAX_OFFSET = 2000; // Aumentar límite para permitir más navegación
+    manager.editor.viewOffset.x = Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, manager.editor.viewOffset.x));
+    manager.editor.viewOffset.y = Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, manager.editor.viewOffset.y));
+    manager.lastPanPoint.x = x;
+    manager.lastPanPoint.y = y;
+    return;
+  }
+
+  // Actualizar posición del mouse para otras interacciones
+  manager.inpt.mousePos.x = x;
+  manager.inpt.mousePos.y = y;
+  if (!manager.selection.isSelecting) {
+    let isOverNode = false;
+    for (const node of manager.editor.nodes) {
+      const dx = worldPos.x - node.pos.x;
+      const dy = worldPos.y - node.pos.y;
+      if (Math.sqrt(dx * dx + dy * dy) < 0.2) {
+        isOverNode = true;
+        break;
       }
-      manager.canvas.style.cursor = isOverNode ? 'pointer' : 'default';
     }
+    manager.canvas.style.cursor = isOverNode ? 'pointer' : 'default';
   }
   manager.updateOverlay(manager.inpt.mousePos);
 }
@@ -80,33 +97,117 @@ export function handleMouseDown(manager: any, e: MouseEvent) {
       manager.selection.selectionStartWorld = new manager.Vec2(worldPos.x, worldPos.y);
       manager.canvas.style.cursor = 'crosshair';
     } else {
-      let clickedNode = null;
-      let clickedOnSelected = false;
+      // PRIMERO: Verificar si hay click en un PIN (área invisible ampliada)
+      let clickedPin = null;
+      const PIN_CLICK_RADIUS = 0.3; // Radio amplio para fácil clic en pines
+      
       for (const node of manager.editor.nodes) {
-        const dx = worldPos.x - node.pos.x;
-        const dy = worldPos.y - node.pos.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        if (distance < 0.2) {
-          clickedNode = node;
-          clickedOnSelected = manager.selection.selectedNodes.has(node);
-          break;
-        }
-      }
-      if (clickedNode) {
-        if (!clickedOnSelected && !e.ctrlKey) manager.selection.selectedNodes.clear();
-        if (e.ctrlKey && manager.selection.selectedNodes.has(clickedNode)) manager.selection.selectedNodes.delete(clickedNode);
-        else manager.selection.selectedNodes.add(clickedNode);
-        if (manager.selection.selectedNodes.size > 0) {
-          manager.selection.isMovingSelection = true;
-          manager.selection.selectionMoveStart = new manager.Vec2(worldPos.x, worldPos.y);
-          manager.selection.nodeOffsets.clear();
-          for (const node of manager.selection.selectedNodes) {
-            manager.selection.nodeOffsets.set(node, new manager.Vec2(node.pos.x, node.pos.y));
+        // Verificar pines de entrada
+        for (const pin of node.inputs) {
+          const dx = worldPos.x - pin.pos.x;
+          const dy = worldPos.y - pin.pos.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance < PIN_CLICK_RADIUS) {
+            clickedPin = pin;
+            console.log(`📌 PIN CLICKEADO: ${pin.name} (input) del nodo ${node.title}`);
+            break;
           }
         }
+        if (clickedPin) break;
+        
+        // Verificar pines de salida
+        for (const pin of node.outputs) {
+          const dx = worldPos.x - pin.pos.x;
+          const dy = worldPos.y - pin.pos.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance < PIN_CLICK_RADIUS) {
+            clickedPin = pin;
+            console.log(`📌 PIN CLICKEADO: ${pin.name} (output) del nodo ${node.title}`);
+            break;
+          }
+        }
+        if (clickedPin) break;
+      }
+      
+      if (clickedPin) {
+        // Sistema simple: primer click selecciona, segundo click conecta
+        if (!manager.editor.selectedPin) {
+          // Primer click: seleccionar pin origen
+          manager.editor.selectedPin = clickedPin;
+          console.log(`📌 Pin seleccionado: ${clickedPin.name} del nodo ${clickedPin.parent.title}`);
+          manager.canvas.style.cursor = 'crosshair';
+        } else {
+          // Segundo click: intentar conectar
+          const fromPin = manager.editor.selectedPin;
+          const toPin = clickedPin;
+          
+          if (fromPin !== toPin && fromPin.isInput !== toPin.isInput) {
+            // Conexión válida
+            let sourcePin = fromPin.isInput ? toPin : fromPin;
+            let targetPin = fromPin.isInput ? fromPin : toPin;
+            
+            // IMPORTANTE: Si el pin de entrada ya tiene conexión, eliminarla primero
+            if (targetPin.userData !== null && targetPin.userData !== undefined) {
+              const oldIndex = targetPin.userData;
+              if (manager.editor.links[oldIndex]) {
+                console.log(`🗑️ Eliminando conexión anterior del pin ${targetPin.name}`);
+                // Limpiar userData de ambos pines de la conexión anterior
+                const oldLink = manager.editor.links[oldIndex];
+                if (oldLink[0]) oldLink[0].userData = null;
+                if (oldLink[1]) oldLink[1].userData = null;
+                manager.editor.links[oldIndex] = null; // Marcar como eliminado
+              }
+            }
+            
+            console.log(`🔗 Conectando: ${sourcePin.parent.title}.${sourcePin.name} → ${targetPin.parent.title}.${targetPin.name}`);
+            
+            // Crear la nueva conexión
+            const index = manager.editor.links.length;
+            sourcePin.userData = index;
+            targetPin.userData = index;
+            manager.editor.links[index] = [sourcePin, targetPin];
+            
+            // Recalcular valores
+            manager.editor.computeAll();
+          } else {
+            console.log('❌ Conexión inválida: mismo pin o mismo tipo');
+          }
+          
+          // Limpiar selección
+          manager.editor.selectedPin = null;
+          manager.canvas.style.cursor = 'default';
+        }
+        return;
       } else {
-        if (!e.ctrlKey) manager.selection.selectedNodes.clear();
-        manager.inpt.mouseButtonLeft = true;
+        // SEGUNDO: Si no hay pin, verificar click en nodo
+        let clickedNode = null;
+        let clickedOnSelected = false;
+        for (const node of manager.editor.nodes) {
+          const dx = worldPos.x - node.pos.x;
+          const dy = worldPos.y - node.pos.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance < 0.2) {
+            clickedNode = node;
+            clickedOnSelected = manager.selection.selectedNodes.has(node);
+            break;
+          }
+        }
+        if (clickedNode) {
+          if (!clickedOnSelected && !e.ctrlKey) manager.selection.selectedNodes.clear();
+          if (e.ctrlKey && manager.selection.selectedNodes.has(clickedNode)) manager.selection.selectedNodes.delete(clickedNode);
+          else manager.selection.selectedNodes.add(clickedNode);
+          if (manager.selection.selectedNodes.size > 0) {
+            manager.selection.isMovingSelection = true;
+            manager.selection.selectionMoveStart = new manager.Vec2(worldPos.x, worldPos.y);
+            manager.selection.nodeOffsets.clear();
+            for (const node of manager.selection.selectedNodes) {
+              manager.selection.nodeOffsets.set(node, new manager.Vec2(node.pos.x, node.pos.y));
+            }
+          }
+        } else {
+          if (!e.ctrlKey) manager.selection.selectedNodes.clear();
+          manager.inpt.mouseButtonLeft = true;
+        }
       }
     }
   } else if (e.button === 1) {
@@ -123,6 +224,14 @@ export function handleMouseDown(manager: any, e: MouseEvent) {
 
 export function handleMouseUp(manager: any, e: MouseEvent) {
   if (e.button === 0) {
+    const rect = manager.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const screenPos = new manager.Vec2(x, y);
+    const worldPosUp = manager.screenToWorld(screenPos);
+    
+    // El sistema de conexiones ahora es click-click, no hay arrastre a manejar
+    
     if (manager.isDragging) {
       manager.isDragging = false;
       manager.canvas.style.cursor = manager.isMoveMode ? 'grab' : 'default';
@@ -188,23 +297,25 @@ export function handleDblClick(manager: any, e: MouseEvent) {
   
   for (const node of manager.editor.nodes) {
     // Usar el tamaño real del nodo para detección de rectángulo
-    const halfWidth = node.size.x / 2;
-    const halfHeight = node.size.y / 2;
-    
-    // Verificar si el click está dentro del rectángulo del nodo
+    // Ampliar área de detección: margen extra de 0.3 unidades
+    const margin = 0.3;
+    const halfWidth = node.size.x / 2 + margin;
+    const halfHeight = node.size.y / 2 + margin;
+
+    // Verificar si el click está dentro del rectángulo ampliado del nodo
     const withinX = worldPos.x >= (node.pos.x - halfWidth) && worldPos.x <= (node.pos.x + halfWidth);
     const withinY = worldPos.y >= (node.pos.y - halfHeight) && worldPos.y <= (node.pos.y + halfHeight);
-    
-    console.log(`  📦 Nodo "${node.title}" en (${node.pos.x.toFixed(2)}, ${node.pos.y.toFixed(2)}), tamaño: ${node.size.x.toFixed(1)}×${node.size.y.toFixed(1)}`);
+
+    console.log(`  📦 Nodo "${node.title}" en (${node.pos.x.toFixed(2)}, ${node.pos.y.toFixed(2)}), tamaño: ${node.size.x.toFixed(1)}×${node.size.y.toFixed(1)}, margen: ${margin}`);
     console.log(`     Límites: X[${(node.pos.x - halfWidth).toFixed(2)} - ${(node.pos.x + halfWidth).toFixed(2)}], Y[${(node.pos.y - halfHeight).toFixed(2)} - ${(node.pos.y + halfHeight).toFixed(2)}]`);
     console.log(`     Dentro: X=${withinX}, Y=${withinY}`);
-    
+
     if (withinX && withinY) {
       // Calcular distancia al centro para priorizar nodos más cercanos si hay overlapping
       const dx = worldPos.x - node.pos.x;
       const dy = worldPos.y - node.pos.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
-      
+
       if (distance < minDistance) {
         minDistance = distance;
         foundNode = node;
@@ -264,6 +375,29 @@ export function handleKeyDown(manager: any, e: KeyboardEvent) {
   if (!manager.keys.has(key)) {
     manager.keys.add(key);
     if (key === 'delete' || key === 'backspace') {
+      // PRIMERO: Si hay un pin seleccionado, eliminar su conexión
+      if (manager.editor.selectedPin) {
+        const pin = manager.editor.selectedPin;
+        if (pin.userData !== null && pin.userData !== undefined) {
+          const linkIndex = pin.userData;
+          const link = manager.editor.links[linkIndex];
+          if (link) {
+            console.log(`🗑️ Eliminando conexión del pin ${pin.name}`);
+            // Limpiar userData de ambos pines
+            if (link[0]) link[0].userData = null;
+            if (link[1]) link[1].userData = null;
+            manager.editor.links[linkIndex] = null; // Marcar como eliminado
+            // Recalcular valores
+            manager.editor.computeAll();
+          }
+        }
+        // Limpiar selección
+        manager.editor.selectedPin = null;
+        manager.canvas.style.cursor = 'default';
+        return;
+      }
+      
+      // SEGUNDO: Si hay nodos seleccionados, eliminarlos
       if (manager.selection.selectedNodes.size > 0) {
         const nodesToDelete = new Set(manager.selection.selectedNodes);
         manager.editor.nodes = manager.editor.nodes.filter((node: any) => !nodesToDelete.has(node));

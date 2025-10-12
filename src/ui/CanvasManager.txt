@@ -55,7 +55,7 @@ export class CanvasManager {
       zoomRange.value = '100';
       zoomRange.addEventListener('input', (e) => {
         const value = parseInt((e.target as HTMLInputElement).value);
-        this.editor.scale = value / 100;
+        this.editor.scale = value / PIXELS_PER_UNIT;
         this.updateOverlay(this.inpt.mousePos);
       });
     }

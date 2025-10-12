@@ -5,15 +5,21 @@ import { ExecutionPluginManager } from './ExecutionPlugin';
 import { BuiltinPlugins } from './plugins/BuiltinPlugins';
 
 export class NodeEditor {
+  // Factor de conversión fundamental: 100 píxeles = 1 unidad de mundo
+  private readonly PIXELS_PER_UNIT = 100;
+
   /**
-   * Agrega un nodo al editor en una posición aleatoria o especificada
+   * Agrega un nodo al editor en el CENTRO de la vista actual
    */
   public addNode(nodeType: string = 'number', x?: number, y?: number) {
-    const posX = x ?? -this.viewOffset.x + (Math.random() * 2 - 1);
-    const posY = y ?? -this.viewOffset.y + (Math.random() * 2 - 1);
+    // Si no se especifica posición, colocar en el CENTRO de la vista actual
+    const posX = x ?? this.viewOffset.x;
+    const posY = y ?? this.viewOffset.y;
+    
     const node = Node.create(nodeType, posX, posY);
     if (node) {
       this.nodes.push(node);
+      console.log(`✅ Nodo ${nodeType} creado en posición (${posX.toFixed(1)}, ${posY.toFixed(1)})`);
     }
     return node;
   }
@@ -45,8 +51,10 @@ export class NodeEditor {
           maxX = Math.max(maxX, nodeData.position.x);
           maxY = Math.max(maxY, nodeData.position.y);
         }
-        const absoluteX = (nodeData.position?.x || 0) / 100;
-        const absoluteY = (nodeData.position?.y || 0) / 100;
+        // Las coordenadas de templates YA están en unidades mundo (no dividir por 100)
+        const absoluteX = nodeData.position?.x || 0;
+        const absoluteY = nodeData.position?.y || 0;
+        console.log(`🔍 Cargando nodo ${nodeData.type} en posición (${absoluteX}, ${absoluteY})`);
         const node = Node.create(nodeData.type, absoluteX, absoluteY);
         if (node) {
           if (nodeData.data) {
@@ -61,6 +69,7 @@ export class NodeEditor {
           }
           node.pos.x = absoluteX;
           node.pos.y = absoluteY;
+          console.log(`✅ Nodo ${nodeData.type} asignado a node.pos (${node.pos.x}, ${node.pos.y})`);
           this.nodes.push(node);
           nodeMap[nodeData.id || i + 1] = node;
         }
@@ -75,17 +84,19 @@ export class NodeEditor {
         }
       }
       if (minX !== Infinity && minY !== Infinity) {
-        const centerX = (minX + maxX) / 200;
-        const centerY = (minY + maxY) / 200;
+        // Centrar usando valores tal cual (rango -2 a 2)
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
         this.viewOffset.x = centerX;
         this.viewOffset.y = centerY;
-        const width = (maxX - minX) / 100;
-        const height = (maxY - minY) / 100;
+        // Escalado razonable para rango -2 a 2
+        const width = (maxX - minX);
+        const height = (maxY - minY);
         const scale = Math.min(
-          window.innerWidth / (width + 2),
-          (window.innerHeight - 50) / (height + 2)
+          window.innerWidth / ((width + 2) * this.PIXELS_PER_UNIT),
+          (window.innerHeight - 50) / ((height + 2) * this.PIXELS_PER_UNIT)
         );
-        this.scale = Math.max(0.1, Math.min(1, scale / 200));
+        this.scale = Math.max(0.2, Math.min(2, scale));
       }
       this.computeAll();
     } catch (error) {
@@ -102,7 +113,8 @@ export class NodeEditor {
   public pluginManager: ExecutionPluginManager = new ExecutionPluginManager();
 
   private draggingNode: Node | null = null;
-  private draggingPin: Pin | null = null;
+  public draggingPin: Pin | null = null; // Público para acceso desde eventos
+  public selectedPin: Pin | null = null; // Pin seleccionado para conectar
   private hoveringPin: Pin | null = null;
   private lastMousePos: Vec2 = new Vec2();
   private tempLinkEnd: Vec2 = new Vec2();
@@ -124,18 +136,24 @@ export class NodeEditor {
   }
 
   private screenToWorld(screenPos: Vec2): Vec2 {
-    const scaleFactor = 100 * this.scale;
+    // IMPORTANTE: Debe coincidir con el factor usado en render() -> ctx.scale(PIXELS_PER_UNIT * this.scale)
+    const centerX = window.innerWidth / 2;
+    const centerY = (window.innerHeight - 50) / 2;
+    
     return new Vec2(
-      (screenPos.x - window.innerWidth / 2) / scaleFactor + this.viewOffset.x,
-      (screenPos.y - (window.innerHeight - 50) / 2) / scaleFactor + this.viewOffset.y
+      (screenPos.x - centerX) / (this.PIXELS_PER_UNIT * this.scale) + this.viewOffset.x,
+      (screenPos.y - centerY) / (this.PIXELS_PER_UNIT * this.scale) + this.viewOffset.y
     );
   }
 
   private worldToScreen(worldPos: Vec2): Vec2 {
-    const scaleFactor = 100 * this.scale;
+    // IMPORTANTE: Proceso inverso de screenToWorld
+    const centerX = window.innerWidth / 2;
+    const centerY = (window.innerHeight - 50) / 2;
+    
     return new Vec2(
-      (worldPos.x - this.viewOffset.x) * scaleFactor + window.innerWidth / 2,
-      (worldPos.y - this.viewOffset.y) * scaleFactor + (window.innerHeight - 50) / 2
+      (worldPos.x - this.viewOffset.x) * (this.PIXELS_PER_UNIT * this.scale) + centerX,
+      (worldPos.y - this.viewOffset.y) * (this.PIXELS_PER_UNIT * this.scale) + centerY
     );
   }
 
@@ -181,7 +199,11 @@ export class NodeEditor {
     this.scale = Math.max(0.1, inpt.scale);
     const currentMouseWorld = this.screenToWorld(inpt.mousePos);
 
-    if (inpt.mouseButtonMiddle) {
+    // Bloquear panning si hay un nodo siendo arrastrado O si se está creando una conexión
+    const isNodeBeingDragged = this.draggingNode !== null;
+    const isPinBeingDragged = this.draggingPin !== null;
+    
+    if (inpt.mouseButtonMiddle && !isNodeBeingDragged && !isPinBeingDragged) {
       const delta = currentMouseWorld.subtract(this.screenToWorld(this.lastMousePos));
       this.viewOffset = this.viewOffset.subtract(delta);
     }
@@ -208,7 +230,10 @@ export class NodeEditor {
       }
     }
 
-    if (inpt.deletePressed) {
+    // Solo eliminar nodos si el foco NO está en un input editable
+    const activeElement = document.activeElement;
+    const isInputFocused = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA');
+    if (inpt.deletePressed && !isInputFocused) {
       this.nodes = this.nodes.filter(node => !node.selected);
       this.links = this.links.filter(link => 
         link[0] && link[1] && !link[0].parent.selected && !link[1].parent.selected
@@ -255,11 +280,11 @@ export class NodeEditor {
     }
 
     // Iniciar acciones al presionar botón izquierdo
-    if (inpt.mouseButtonLeft && !this.lastMouseButtonLeft) {
+    if (inpt.mouseButtonLeft && !this.lastMouseButtonLeft && !inpt.mouseButtonMiddle) {
       if (this.hoveringPin) {
         // Empezar a arrastrar desde un pin
         this.draggingPin = this.hoveringPin;
-        this.tempLinkEnd = currentMouseWorld;
+        this.tempLinkEnd = inpt.mousePos;
       } else {
         // Intentar seleccionar un nodo
         for (const node of this.nodes) {
@@ -285,7 +310,7 @@ export class NodeEditor {
 
     // Actualizar línea temporal de conexión
     if (this.draggingPin && inpt.mouseButtonLeft) {
-      this.tempLinkEnd = currentMouseWorld;
+      this.tempLinkEnd = inpt.mousePos;
     }
 
     // Soltar botón izquierdo
@@ -518,12 +543,12 @@ export class NodeEditor {
     // DIBUJAR CUADRICULA Y EJES
     ctx.save();
     ctx.translate(width / 2, height / 2);
-    ctx.scale(100 * this.scale, 100 * this.scale);
+    ctx.scale(this.PIXELS_PER_UNIT * this.scale, this.PIXELS_PER_UNIT * this.scale);
     ctx.translate(-this.viewOffset.x, -this.viewOffset.y);
 
-    // Cuadrícula principal
+    // Cuadrícula con ÁREA MUY GRANDE para templates complejos
     const gridSpacing = 1;
-    const gridRange = Math.max(width, height) / (100 * this.scale) + 10;
+    const gridRange = 25; // Área fija de 50x50 unidades (-25 a +25)
     
     // Cuadrícula secundaria (más tenue)
     ctx.strokeStyle = 'rgba(255,255,255,0.04)';
@@ -587,9 +612,7 @@ export class NodeEditor {
   }
 
   private renderTempLink(ctx: CanvasRenderingContext2D) {
-    if (this.draggingPin) {
-      this.drawBezierLink(ctx, this.draggingPin.pos, this.tempLinkEnd, true);
-    }
+    // No hay líneas temporales en el sistema click-click
   }
 
   private drawBezierLink(ctx: CanvasRenderingContext2D, p1: Vec2, p2: Vec2, isTemp: boolean = false) {
@@ -735,16 +758,23 @@ export class NodeEditor {
 
   private renderPins(ctx: CanvasRenderingContext2D, node: Node) {
     const renderPin = (pin: Pin) => {
+      const isSelected = pin === this.selectedPin;
+      const radius = isSelected ? 0.1 : 0.06; // Pin seleccionado más grande
+      
       ctx.beginPath();
-      ctx.arc(pin.pos.x, pin.pos.y, 0.06, 0, 2 * Math.PI);
+      ctx.arc(pin.pos.x, pin.pos.y, radius, 0, 2 * Math.PI);
       
       // Color según el tipo de pin
       const gradient = ctx.createRadialGradient(
         pin.pos.x, pin.pos.y, 0,
-        pin.pos.x, pin.pos.y, 0.06
+        pin.pos.x, pin.pos.y, radius
       );
 
-      if (pin.type === PinType.Number) {
+      if (isSelected) {
+        // Pin seleccionado - color amarillo brillante
+        gradient.addColorStop(0, 'rgb(255, 255, 100)');
+        gradient.addColorStop(1, 'rgb(255, 200, 0)');
+      } else if (pin.type === PinType.Number) {
         gradient.addColorStop(0, 'rgb(150, 255, 150)');
         gradient.addColorStop(1, 'rgb(100, 200, 100)');
       }
@@ -753,15 +783,15 @@ export class NodeEditor {
       ctx.fill();
 
       // Borde del pin
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-      ctx.lineWidth = 0.01;
+      ctx.strokeStyle = isSelected ? 'rgb(255, 255, 0)' : 'rgba(255, 255, 255, 0.5)';
+      ctx.lineWidth = isSelected ? 0.02 : 0.01;
       ctx.stroke();
 
       // Nombre del pin
-      ctx.fillStyle = 'rgb(200, 200, 200)';
+      ctx.fillStyle = isSelected ? 'rgb(255, 255, 0)' : 'rgb(200, 200, 200)';
       ctx.font = '0.08px sans-serif';
       ctx.textAlign = pin.isInput ? 'right' : 'left';
-      const textOffset = pin.isInput ? -0.1 : 0.1;
+      const textOffset = pin.isInput ? -0.15 : 0.15;
       ctx.fillText(pin.name, pin.pos.x + textOffset, pin.pos.y + 0.03);
     };
 

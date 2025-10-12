@@ -142,6 +142,13 @@ export class DatabaseService {
         }));
     }
 
+    async deleteTemplate(id: number) {
+        if (!this.db) throw new Error('Database not initialized');
+        
+        this.db.run('DELETE FROM workflow_templates WHERE id = ?', [id]);
+        this.saveToLocalStorage();
+    }
+
     // ===== CRUD para Node Presets =====
     async saveNodePreset(preset: NodePreset) {
         if (!this.db) throw new Error('Database not initialized');

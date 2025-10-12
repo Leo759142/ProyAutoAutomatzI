@@ -149,9 +149,9 @@ export function initCanvasUI() {
   if (!canvas) throw new Error('Canvas element not found');
   const ctx = canvas.getContext('2d')!;
   
-  // Establecer tamaño inicial del canvas - un poco más pequeño que la ventana
-  canvas.width = window.innerWidth - 40; // 20px margen a cada lado
-  canvas.height = window.innerHeight - 100; // margen para la toolbar y abajo
+  // Canvas ocupa TODA la ventana disponible para máxima área de trabajo
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight - 80; // Solo margen para toolbar
   
   const coordsDisplay = document.getElementById('coordinates') || document.createElement('span');
   const zoomDisplay = document.getElementById('zoom') || document.createElement('span');
@@ -228,9 +228,11 @@ export function initCanvasUI() {
 
   // Delegar eventos
   window.addEventListener('resize', () => {
+    // Canvas se ajusta COMPLETAMENTE a la ventana
     canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    canvas.height = window.innerHeight - 80; // Solo espacio para toolbar
     inpt.aspectRatio = canvas.width / canvas.height;
+    console.log(`📐 Canvas redimensionado: ${canvas.width}x${canvas.height}`);
   });
   canvas.addEventListener('mousemove', (e) => CanvasEvents.handleMouseMove({
     canvas, ctx, editor, selection, execution, isMoveMode, lastTime, keys, inpt, lastMousePos, isPanning, lastPanPoint, isDragging, dragStart, viewOffsetStart,
