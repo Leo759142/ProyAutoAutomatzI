@@ -159,7 +159,7 @@ export function initCanvasUI() {
   const editor = new NodeEditor(onConnect, onDrop);
   const selection = new CanvasSelection();
   const execution = new CanvasExecution(editor);
-  const propertiesPanel = new PropertiesPanel();
+  const propertiesPanel = new PropertiesPanel(editor); // ✅ Pasar editor al panel
   let isMoveMode = false;
   let lastTime = 0;
   let keys: Set<string> = new Set();

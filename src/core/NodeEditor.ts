@@ -710,7 +710,8 @@ export class NodeEditor {
   }
 
   private renderLinks(ctx: CanvasRenderingContext2D) {
-    for (let i = 1; i < this.links.length; i++) {
+    // ✅ FIX: Empezar desde 0 para renderizar TODAS las conexiones
+    for (let i = 0; i < this.links.length; i++) {
       const link = this.links[i];
       if (link && link[0] && link[1]) {
         this.drawBezierLink(ctx, link[0].pos, link[1].pos);

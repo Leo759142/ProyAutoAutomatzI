@@ -3,15 +3,25 @@
 
 import { Node } from '../core/Node';
 import { PinType } from '../types/types';
+import { NodeEditor } from '../core/NodeEditor';
 
 export class PropertiesPanel {
   private panel: HTMLElement;
   private currentNode: Node | null = null;
   private inputElements: Map<number, HTMLInputElement> = new Map();
+  private editor: NodeEditor | null = null;
 
-  constructor() {
+  constructor(editor?: NodeEditor) {
     this.panel = document.getElementById('propertiesPanel')!;
+    this.editor = editor || null;
     this.setupEventListeners();
+  }
+  
+  /**
+   * Establece el editor para poder ejecutar computeAll después de aplicar cambios
+   */
+  public setEditor(editor: NodeEditor) {
+    this.editor = editor;
   }
 
   private setupEventListeners() {
@@ -247,8 +257,15 @@ export class PropertiesPanel {
 
     console.log('✅ Propiedades aplicadas:', {
       node: this.currentNode.title,
-      inputs: this.currentNode.inputs.map(p => ({ name: p.name, value: p.value }))
+      inputs: this.currentNode.inputs.map(p => ({ name: p.name, value: p.value })),
+      outputs: this.currentNode.outputs.map(p => ({ name: p.name, value: p.value }))
     });
+
+    // ✅ FIX: Ejecutar computeAll para propagar los cambios inmediatamente
+    if (this.editor) {
+      console.log('🔄 Propagando cambios a nodos conectados...');
+      this.editor.computeAll();
+    }
 
     this.hide();
   }
