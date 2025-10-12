@@ -37,29 +37,63 @@ export class NodeEditor {
    */
   public loadWorkflowTemplate(template: { nodes_data: string; connections_data: string; }) {
     try {
+      console.log('🚀 ========== INICIANDO CARGA DE TEMPLATE ==========');
       this.clearCanvas();
+      
+      // Validar que los datos no estén vacíos
+      if (!template.nodes_data || !template.connections_data) {
+        console.error('❌ Template incompleto: faltan nodes_data o connections_data');
+        return;
+      }
+
       const nodesData = JSON.parse(template.nodes_data);
       const connectionsData = JSON.parse(template.connections_data);
+      
+      console.log(`📦 Total de nodos a cargar: ${nodesData.length}`);
+      console.log(`🔗 Total de conexiones a crear: ${connectionsData.length}`);
+      
       const nodeMap: { [key: number]: any } = {};
+      let nodesCreatedCount = 0;
+      let nodesFailedCount = 0;
 
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      
+      // FASE 1: Crear todos los nodos
       for (let i = 0; i < nodesData.length; i++) {
         const nodeData = nodesData[i];
+        
+        // Validar que el nodo tenga los datos mínimos
+        if (!nodeData.type) {
+          console.error(`❌ Nodo en índice ${i} no tiene tipo definido:`, nodeData);
+          nodesFailedCount++;
+          continue;
+        }
+
+        if (!nodeData.id) {
+          console.warn(`⚠️ Nodo ${nodeData.type} en índice ${i} no tiene ID, usando índice+1`);
+          nodeData.id = i + 1;
+        }
+
         if (nodeData.position) {
           minX = Math.min(minX, nodeData.position.x);
           minY = Math.min(minY, nodeData.position.y);
           maxX = Math.max(maxX, nodeData.position.x);
           maxY = Math.max(maxY, nodeData.position.y);
         }
-        // Las coordenadas de templates YA están en unidades mundo (no dividir por 100)
+        
         const absoluteX = nodeData.position?.x || 0;
         const absoluteY = nodeData.position?.y || 0;
-        console.log(`🔍 Cargando nodo ${nodeData.type} en posición (${absoluteX}, ${absoluteY})`);
+        
+        console.log(`🔍 [${i+1}/${nodesData.length}] Creando nodo ID=${nodeData.id}, tipo="${nodeData.type}", pos=(${absoluteX}, ${absoluteY})`);
+        
         const node = Node.create(nodeData.type, absoluteX, absoluteY);
+        
         if (node) {
+          // Aplicar datos personalizados al nodo
           if (nodeData.data) {
             if (nodeData.data.value !== undefined && node.outputs.length > 0) {
               node.outputs[0].value = nodeData.data.value;
+              console.log(`  ✓ Valor inicial del nodo: ${nodeData.data.value}`);
             }
             for (const key in nodeData.data) {
               if (key !== 'value' && nodeData.data.hasOwnProperty(key) && key in node) {
@@ -67,29 +101,93 @@ export class NodeEditor {
               }
             }
           }
+          
           node.pos.x = absoluteX;
           node.pos.y = absoluteY;
-          console.log(`✅ Nodo ${nodeData.type} asignado a node.pos (${node.pos.x}, ${node.pos.y})`);
           this.nodes.push(node);
-          nodeMap[nodeData.id || i + 1] = node;
+          nodeMap[nodeData.id] = node;
+          nodesCreatedCount++;
+          console.log(`✅ Nodo ID=${nodeData.id} creado exitosamente (${nodesCreatedCount}/${nodesData.length})`);
+        } else {
+          console.error(`❌ No se pudo crear nodo ID=${nodeData.id}, tipo="${nodeData.type}". El tipo no existe en NodeTypes.`);
+          nodesFailedCount++;
         }
       }
-      for (const conn of connectionsData) {
+
+      console.log(`\n📊 RESUMEN CREACIÓN DE NODOS:`);
+      console.log(`  ✅ Creados: ${nodesCreatedCount}`);
+      console.log(`  ❌ Fallidos: ${nodesFailedCount}`);
+      console.log(`  📝 IDs en mapa:`, Object.keys(nodeMap).join(', '));
+      
+      // FASE 2: Crear conexiones
+      let connectionsCreatedCount = 0;
+      let connectionsFailedCount = 0;
+      
+      console.log(`\n🔗 ========== CREANDO CONEXIONES ==========`);
+      
+      for (let i = 0; i < connectionsData.length; i++) {
+        const conn = connectionsData[i];
+        
+        // Validar estructura de la conexión
+        if (!conn.from || !conn.to) {
+          console.error(`❌ Conexión ${i+1} mal formada:`, conn);
+          connectionsFailedCount++;
+          continue;
+        }
+        
         const fromNode = nodeMap[conn.from.node];
         const toNode = nodeMap[conn.to.node];
-        if (fromNode && toNode) {
-          if (fromNode.outputs[conn.from.pin] && toNode.inputs[conn.to.pin]) {
-            this.onConnect(fromNode.outputs[conn.from.pin], toNode.inputs[conn.to.pin]);
-          }
+        
+        console.log(`🔍 [${i+1}/${connectionsData.length}] Conectando: Nodo ${conn.from.node}[pin ${conn.from.pin}] → Nodo ${conn.to.node}[pin ${conn.to.pin}]`);
+        
+        if (!fromNode) {
+          console.error(`  ❌ Nodo origen ID=${conn.from.node} no encontrado en el mapa`);
+          connectionsFailedCount++;
+          continue;
         }
+        
+        if (!toNode) {
+          console.error(`  ❌ Nodo destino ID=${conn.to.node} no encontrado en el mapa`);
+          connectionsFailedCount++;
+          continue;
+        }
+        
+        const fromPin = fromNode.outputs[conn.from.pin];
+        const toPin = toNode.inputs[conn.to.pin];
+        
+        if (!fromPin) {
+          console.error(`  ❌ Pin de salida ${conn.from.pin} no existe en nodo ${conn.from.node} (tiene ${fromNode.outputs.length} outputs)`);
+          connectionsFailedCount++;
+          continue;
+        }
+        
+        if (!toPin) {
+          console.error(`  ❌ Pin de entrada ${conn.to.pin} no existe en nodo ${conn.to.node} (tiene ${toNode.inputs.length} inputs)`);
+          connectionsFailedCount++;
+          continue;
+        }
+        
+        // Verificar compatibilidad de tipos
+        if (fromPin.type !== toPin.type) {
+          console.warn(`  ⚠️ ADVERTENCIA: Tipos incompatibles - ${fromPin.type} → ${toPin.type}`);
+        }
+        
+        this.onConnect(fromPin, toPin);
+        connectionsCreatedCount++;
+        console.log(`  ✅ Conexión creada exitosamente (${connectionsCreatedCount}/${connectionsData.length})`);
       }
+      
+      console.log(`\n📊 RESUMEN CREACIÓN DE CONEXIONES:`);
+      console.log(`  ✅ Creadas: ${connectionsCreatedCount}`);
+      console.log(`  ❌ Fallidas: ${connectionsFailedCount}`);
+      
+      // FASE 3: Ajustar vista y zoom
       if (minX !== Infinity && minY !== Infinity) {
-        // Centrar usando valores tal cual (rango -2 a 2)
         const centerX = (minX + maxX) / 2;
         const centerY = (minY + maxY) / 2;
         this.viewOffset.x = centerX;
         this.viewOffset.y = centerY;
-        // Escalado razonable para rango -2 a 2
+        
         const width = (maxX - minX);
         const height = (maxY - minY);
         const scale = Math.min(
@@ -97,10 +195,19 @@ export class NodeEditor {
           (window.innerHeight - 50) / ((height + 2) * this.PIXELS_PER_UNIT)
         );
         this.scale = Math.max(0.2, Math.min(2, scale));
+        
+        console.log(`\n🎯 Vista ajustada: centro=(${centerX.toFixed(2)}, ${centerY.toFixed(2)}), zoom=${(this.scale * 100).toFixed(0)}%`);
       }
+      
+      // FASE 4: Ejecutar una vez para inicializar valores
       this.computeAll();
+      
+      console.log(`\n✅ ========== CARGA DE TEMPLATE COMPLETADA ==========\n`);
+      
     } catch (error) {
-      console.error('Error al cargar el template:', error);
+      console.error('❌ ========== ERROR CRÍTICO AL CARGAR TEMPLATE ==========');
+      console.error('Error:', error);
+      console.error('Stack:', (error as Error).stack);
     }
   }
   nodes: Node[] = [];

@@ -3,8 +3,17 @@ import './style.css';
 import { initCanvasUI } from './ui/canvas/initCanvasUI';
 import { DatabaseService } from './services/DatabaseService';
 import { defaultTemplates } from './templates/DefaultTemplates';
+import { validateAllTemplates } from './utils/validateTemplates';
 
 document.addEventListener('DOMContentLoaded', () => {
+  // 🔍 VALIDAR TODOS LOS TEMPLATES ANTES DE CARGARLOS
+  console.log('🔍 Validando templates antes de cargar...');
+  const templatesValid = validateAllTemplates();
+  
+  if (!templatesValid) {
+    console.error('❌ ADVERTENCIA: Algunos templates tienen errores. Revisa la consola.');
+  }
+
   // Inicializar la UI modular del canvas
   const canvasUI = initCanvasUI();
 

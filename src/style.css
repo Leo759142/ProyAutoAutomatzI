@@ -76,7 +76,6 @@ nav#toolbar::-webkit-scrollbar-thumb {
 nav#toolbar::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(90deg, rgba(255,255,255,0.28), rgba(76,175,80,0.28));
 }
-}
 
 .toolbar-separator {
   width: 2px;
