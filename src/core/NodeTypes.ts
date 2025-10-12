@@ -347,6 +347,72 @@ export const NodeTypes: { [key: string]: NodeDefinition } = {
         }
     },
 
+    "max": {
+        type: "max",
+        category: "math",
+        title: "MAX",
+        inputs: [
+            {
+                name: "A",
+                type: PinType.Number,
+                mode: PinMode.Input,
+                defaultValue: 0
+            },
+            {
+                name: "B",
+                type: PinType.Number,
+                mode: PinMode.Input,
+                defaultValue: 0
+            }
+        ],
+        outputs: [{
+            name: "result",
+            type: PinType.Number,
+            mode: PinMode.Output
+        }],
+        compute: (inputs: any[]) => {
+            // Soporta inputs dinámicos: encuentra el máximo de todos los inputs
+            if (inputs.length > 2) {
+                const validInputs = inputs.filter(v => v !== undefined && v !== null);
+                return validInputs.length > 0 ? [Math.max(...validInputs)] : [0];
+            }
+            return [Math.max(inputs[0] ?? 0, inputs[1] ?? 0)];
+        }
+    },
+
+    "min": {
+        type: "min",
+        category: "math",
+        title: "MIN",
+        inputs: [
+            {
+                name: "A",
+                type: PinType.Number,
+                mode: PinMode.Input,
+                defaultValue: 0
+            },
+            {
+                name: "B",
+                type: PinType.Number,
+                mode: PinMode.Input,
+                defaultValue: 0
+            }
+        ],
+        outputs: [{
+            name: "result",
+            type: PinType.Number,
+            mode: PinMode.Output
+        }],
+        compute: (inputs: any[]) => {
+            // Soporta inputs dinámicos: encuentra el mínimo de todos los inputs
+            if (inputs.length > 2) {
+                const validInputs = inputs.filter(v => v !== undefined && v !== null);
+                return validInputs.length > 0 ? [Math.min(...validInputs)] : [0];
+            }
+            return [Math.min(inputs[0] ?? 0, inputs[1] ?? 0)];
+        }
+    },
+
     // ===== NODOS DE STRINGS =====
     "string": {
         type: "string",

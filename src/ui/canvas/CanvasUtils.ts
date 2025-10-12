@@ -44,3 +44,97 @@ export function worldToScreen(worldPos: Vec2, canvas: HTMLCanvasElement, scale: 
     (worldPos.y - viewOffset.y) * (PIXELS_PER_UNIT * scale) + centerY
   );
 }
+
+/**
+ * Evalúa un punto en una curva Bezier cúbica
+ * @param t - Parámetro [0, 1]
+ * @param p0 - Punto inicial
+ * @param p1 - Punto de control 1
+ * @param p2 - Punto de control 2
+ * @param p3 - Punto final
+ */
+function evaluateCubicBezier(t: number, p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2): Vec2 {
+  const mt = 1 - t;
+  const mt2 = mt * mt;
+  const mt3 = mt2 * mt;
+  const t2 = t * t;
+  const t3 = t2 * t;
+  
+  return new Vec2(
+    mt3 * p0.x + 3 * mt2 * t * p1.x + 3 * mt * t2 * p2.x + t3 * p3.x,
+    mt3 * p0.y + 3 * mt2 * t * p1.y + 3 * mt * t2 * p2.y + t3 * p3.y
+  );
+}
+
+/**
+ * Calcula la distancia mínima de un punto a una curva Bezier
+ * @param point - Punto a verificar
+ * @param p1 - Punto inicial de la curva (pin origen)
+ * @param p2 - Punto final de la curva (pin destino)
+ * @param samples - Número de puntos a muestrear en la curva (más = más preciso)
+ */
+export function distanceToBezierCurve(point: Vec2, p1: Vec2, p2: Vec2, samples: number = 20): number {
+  // Puntos de control para la curva Bezier (mismo cálculo que en renderizado)
+  const dx = p2.x - p1.x;
+  const controlOffsetX = Math.min(Math.abs(dx) * 0.5, 3.0);
+  
+  const cp1 = new Vec2(p1.x + controlOffsetX, p1.y);
+  const cp2 = new Vec2(p2.x - controlOffsetX, p2.y);
+  
+  let minDistance = Infinity;
+  
+  // Muestrear puntos en la curva
+  for (let i = 0; i <= samples; i++) {
+    const t = i / samples;
+    const bezierPoint = evaluateCubicBezier(t, p1, cp1, cp2, p2);
+    
+    // Calcular distancia euclidiana
+    const dist = distance(point, bezierPoint);
+    minDistance = Math.min(minDistance, dist);
+  }
+  
+  return minDistance;
+}
+
+/**
+ * Calcula distancia euclidiana entre dos puntos
+ */
+function distance(a: Vec2, b: Vec2): number {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+/**
+ * Encuentra la conexión más cercana al punto dado
+ * @param point - Punto en coordenadas del mundo
+ * @param links - Array de conexiones [Pin, Pin]
+ * @param threshold - Distancia máxima para considerar un click válido
+ * @returns El link más cercano o null si ninguno está cerca
+ */
+export function getClosestLink(point: Vec2, links: any[], threshold: number = 0.3): any {
+  let closestLink = null;
+  let minDistance = threshold;
+  
+  for (let i = 0; i < links.length; i++) {
+    const link = links[i];
+    
+    // Verificar que el link sea válido
+    if (!link || link[0] === null || link[1] === null) continue;
+    
+    const [fromPin, toPin] = link;
+    
+    // Verificar que los pins tengan posición
+    if (!fromPin.pos || !toPin.pos) continue;
+    
+    // Calcular distancia del punto a la curva
+    const dist = distanceToBezierCurve(point, fromPin.pos, toPin.pos);
+    
+    if (dist < minDistance) {
+      minDistance = dist;
+      closestLink = { link, index: i, distance: dist };
+    }
+  }
+  
+  return closestLink;
+}

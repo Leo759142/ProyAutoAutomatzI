@@ -132,6 +132,35 @@ export class Node {
     this.size = new Vec2(3.5, Math.max(2.0, Math.max(this.inputs.length, this.outputs.length) * 1.0));
   }
 
+  /**
+   * Elimina el último pin de input si no está conectado
+   * @returns true si se eliminó, false si no se pudo eliminar
+   */
+  public removeLastInput(): boolean {
+    // No permitir eliminar si solo quedan 2 inputs (mínimo)
+    if (this.inputs.length <= 2) {
+      console.warn('⚠️ No se puede eliminar: el nodo debe tener al menos 2 inputs');
+      return false;
+    }
+    
+    const lastPin = this.inputs[this.inputs.length - 1];
+    
+    // Verificar si el pin está conectado
+    if (lastPin.userData !== null && lastPin.userData !== undefined) {
+      console.warn('⚠️ No se puede eliminar: el pin está conectado');
+      return false;
+    }
+    
+    // Eliminar el pin
+    this.inputs.pop();
+    
+    // Ajustar tamaño del nodo
+    this.size = new Vec2(3.5, Math.max(2.0, Math.max(this.inputs.length, this.outputs.length) * 1.0));
+    
+    console.log(`✅ Pin eliminado. Inputs restantes: ${this.inputs.length}`);
+    return true;
+  }
+
   static create(type: string, x: number, y: number, extraInputs?: number): Node | null {
     // Búsqueda directa del tipo
     const definition = NodeTypes[type];

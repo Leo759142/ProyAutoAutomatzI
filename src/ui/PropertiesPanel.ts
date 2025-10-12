@@ -80,7 +80,7 @@ export class PropertiesPanel {
     // Mostrar tipo de nodo
     const nodeTypeDisplay = document.getElementById('nodeTypeDisplay');
     if (nodeTypeDisplay) {
-      nodeTypeDisplay.textContent = `${this.currentNode.title} (${this.currentNode.type})`;
+      nodeTypeDisplay.textContent = this.currentNode.title;
     }
 
     // Contenedor de inputs
@@ -88,6 +88,12 @@ export class PropertiesPanel {
     if (!inputPropertiesContainer) return;
 
     inputPropertiesContainer.innerHTML = '';
+
+    // Agregar controles +/- para nodos multi-input
+    const multiInputTypes = ['add', 'multiply', 'and', 'or', 'concat', 'max', 'min'];
+    if (multiInputTypes.includes(this.currentNode.type)) {
+      this.renderPinControls(inputPropertiesContainer);
+    }
 
     // Si el nodo no tiene inputs, mostrar OUTPUT editable (para nodos de entrada)
     if (this.currentNode.inputs.length === 0 && this.currentNode.outputs.length > 0) {
@@ -268,6 +274,81 @@ export class PropertiesPanel {
     }
 
     this.hide();
+  }
+
+  /**
+   * Renderiza controles +/- para añadir/quitar inputs dinámicamente
+   */
+  private renderPinControls(container: HTMLElement) {
+    if (!this.currentNode) return;
+
+    const controlsDiv = document.createElement('div');
+    controlsDiv.style.cssText = `
+      display: flex;
+      gap: 10px;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+      margin-bottom: 15px;
+      align-items: center;
+    `;
+
+    // Botón + (Añadir input)
+    const addButton = document.createElement('button');
+    addButton.textContent = '➕ Añadir Input';
+    addButton.style.cssText = `
+      flex: 1;
+      padding: 8px;
+      background: #28a745;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+    `;
+    addButton.onclick = () => {
+      if (this.currentNode) {
+        this.currentNode.addExtraInputs(this.currentNode.inputs.length + 1);
+        this.renderProperties(); // Refrescar la UI
+        console.log(`✅ Input añadido. Total inputs: ${this.currentNode.inputs.length}`);
+      }
+    };
+
+    // Botón - (Quitar input)
+    const removeButton = document.createElement('button');
+    removeButton.textContent = '➖ Quitar Input';
+    removeButton.disabled = this.currentNode.inputs.length <= 2;
+    removeButton.style.cssText = `
+      flex: 1;
+      padding: 8px;
+      background: ${this.currentNode.inputs.length <= 2 ? '#6c757d' : '#dc3545'};
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: ${this.currentNode.inputs.length <= 2 ? 'not-allowed' : 'pointer'};
+      font-weight: 600;
+      opacity: ${this.currentNode.inputs.length <= 2 ? '0.5' : '1'};
+    `;
+    removeButton.onclick = () => {
+      if (this.currentNode && this.currentNode.removeLastInput()) {
+        this.renderProperties(); // Refrescar la UI
+      }
+    };
+
+    // Info de inputs actuales
+    const infoSpan = document.createElement('span');
+    infoSpan.textContent = `${this.currentNode.inputs.length} inputs`;
+    infoSpan.style.cssText = `
+      color: #aaa;
+      font-size: 12px;
+      white-space: nowrap;
+    `;
+
+    controlsDiv.appendChild(addButton);
+    controlsDiv.appendChild(removeButton);
+    controlsDiv.appendChild(infoSpan);
+
+    container.appendChild(controlsDiv);
   }
 
   /**

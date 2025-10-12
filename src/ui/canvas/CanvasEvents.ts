@@ -217,6 +217,30 @@ export function handleMouseDown(manager: any, e: MouseEvent) {
     manager.lastPanPoint.y = y;
     manager.canvas.style.cursor = 'grabbing';
   } else if (e.button === 2) {
+    // Click derecho: intentar eliminar conexión
+    const { getClosestLink } = require('./CanvasUtils');
+    const closestLink = getClosestLink(worldPos, manager.editor.links, 0.3);
+    
+    if (closestLink) {
+      const [fromPin, toPin] = closestLink.link;
+      const linkIndex = closestLink.index;
+      
+      console.log(`🗑️ Click derecho: Eliminando conexión ${fromPin.parent.title}.${fromPin.name} → ${toPin.parent.title}.${toPin.name}`);
+      
+      // Limpiar userData de ambos pins
+      if (fromPin) fromPin.userData = null;
+      if (toPin) toPin.userData = null;
+      
+      // Eliminar link
+      manager.editor.links[linkIndex] = null;
+      
+      // Recalcular valores
+      manager.editor.computeAll();
+      
+      e.preventDefault();
+      return;
+    }
+    
     manager.inpt.mouseButtonRight = true;
   }
   e.preventDefault();
