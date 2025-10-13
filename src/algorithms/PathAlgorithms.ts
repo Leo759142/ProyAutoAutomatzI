@@ -81,27 +81,52 @@ function buildWeightedGraph(editor: NodeEditor): Map<number, GraphNode> {
 }
 
 /**
- * Encuentra nodos fuente (sin entradas) y sumidero (sin salidas)
+ * Encuentra nodos fuente (sin entradas) y sumidero (sin salidas significativas)
+ * Excluye info-panel y display nodes
+ * Un nodo es sumidero si solo se conecta a display nodes
  */
 function findSourceAndSink(editor: NodeEditor): { sources: number[]; sinks: number[] } {
     const hasIncoming = new Set<number>();
-    const hasOutgoing = new Set<number>();
+    const hasOutgoingToNonDisplay = new Set<number>();
     
     editor.links.forEach(link => {
         if (!link || !link[0] || !link[1]) return;
         const fromIndex = editor.nodes.indexOf(link[0].parent);
         const toIndex = editor.nodes.indexOf(link[1].parent);
         
-        if (fromIndex !== -1) hasOutgoing.add(fromIndex);
-        if (toIndex !== -1) hasIncoming.add(toIndex);
+        const fromNode = link[0].parent;
+        const toNode = link[1].parent;
+        
+        // Ignorar conexiones con info-panel
+        if (fromNode.type === 'info-panel' || toNode.type === 'info-panel') return;
+        
+        // Marcar nodos con entradas (excepto desde info-panel)
+        if (toIndex !== -1 && toNode.type !== 'display') {
+            hasIncoming.add(toIndex);
+        }
+        
+        // Marcar nodos con salidas hacia nodos NO-display
+        if (fromIndex !== -1 && toNode.type !== 'display' && toNode.type !== 'info-panel') {
+            hasOutgoingToNonDisplay.add(fromIndex);
+        }
     });
     
     const sources: number[] = [];
     const sinks: number[] = [];
     
     editor.nodes.forEach((node, index) => {
-        if (!hasIncoming.has(index)) sources.push(index);
-        if (!hasOutgoing.has(index)) sinks.push(index);
+        // Ignorar info-panel y display nodes
+        if (node.type === 'info-panel' || node.type === 'display') return;
+        
+        // Nodo fuente: no tiene entradas
+        if (!hasIncoming.has(index)) {
+            sources.push(index);
+        }
+        
+        // Nodo sumidero: no tiene salidas significativas (solo a display o nada)
+        if (!hasOutgoingToNonDisplay.has(index)) {
+            sinks.push(index);
+        }
     });
     
     return { sources, sinks };
@@ -343,16 +368,22 @@ export function aStar(editor: NodeEditor, startIndex?: number, endIndex?: number
 
 /**
  * Algoritmo PERT/CPM para encontrar ruta crítica
+ * Maneja múltiples nodos de inicio y fin correctamente
  */
 export function pertCPM(editor: NodeEditor): PathResult {
     const graph = buildWeightedGraph(editor);
     const { sources, sinks } = findSourceAndSink(editor);
     
+    console.log('🔍 PERT/CPM - Análisis inicial:');
+    console.log('  📊 Nodos totales:', graph.size);
+    console.log('  🟢 Nodos fuente:', sources.length, sources.map(i => editor.nodes[i]?.customTitle || `Node ${i}`));
+    console.log('  🔴 Nodos sumidero:', sinks.length, sinks.map(i => editor.nodes[i]?.customTitle || `Node ${i}`));
+    
     if (sources.length === 0 || sinks.length === 0) {
         return {
             algorithm: 'PERT/CPM',
             success: false,
-            message: '❌ El grafo debe tener al menos un nodo de inicio y uno de fin.'
+            message: `❌ El grafo debe tener al menos un nodo de inicio y uno de fin.\n• Nodos fuente: ${sources.length}\n• Nodos sumidero: ${sinks.length}`
         };
     }
     

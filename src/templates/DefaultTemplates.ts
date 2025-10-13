@@ -347,38 +347,38 @@ export const defaultTemplates: WorkflowTemplate[] = [
     nodes_data: JSON.stringify([
       // INFO-PANEL
       { id: 0, type: 'info-panel', position: { x: -20, y: -12 }, 
-        data: { customDescription: '🚚 RED LOGÍSTICA NACIONAL - 10 CIUDADES\n\nProblema: Encontrar ruta más corta desde Ciudad A (Centro Operaciones) hasta Ciudad J (Puerto Exportación).\n\nDijkstra explora TODAS las rutas posibles y garantiza encontrar la óptima.\n\nNOTA: Los valores de los nodos representan la DISTANCIA desde el nodo anterior (costo de la arista).' } },
+        data: { customDescription: '🚚 RED LOGÍSTICA NACIONAL - 10 CIUDADES\n\nProblema: Encontrar ruta más corta desde Ciudad A (Centro Operaciones) hasta Ciudad J (Puerto Exportación).\n\nDijkstra explora TODAS las rutas posibles y garantiza encontrar la óptima.\n\nNOTA: Los valores representan DISTANCIA en km (actividad de transporte entre ciudades).' } },
       
-      // NODOS (10 ciudades)
-      { id: 1, type: 'number', position: { x: -15, y: 0 }, 
-        data: { value: 0, customTitle: 'A: Centro', customDescription: 'Ciudad A - Centro de Operaciones' } },
+      // ACTIVIDADES DE TRANSPORTE (nodos tipo TASK)
+      { id: 1, type: 'task', position: { x: -15, y: 0 }, 
+        data: { value: 0, customTitle: 'A: Centro', customDescription: 'Ciudad A - Centro de Operaciones (INICIO)' } },
       
-      { id: 2, type: 'number', position: { x: -10, y: -4 }, 
-        data: { value: 5, customTitle: 'B: Norte', customDescription: 'Ciudad B - 5km desde A' } },
+      { id: 2, type: 'task', position: { x: -10, y: -4 }, 
+        data: { value: 5, customTitle: 'B: Norte', customDescription: 'Ciudad B - Transporte 5km desde A' } },
       
-      { id: 3, type: 'number', position: { x: -10, y: 4 }, 
-        data: { value: 4, customTitle: 'C: Sur', customDescription: 'Ciudad C - 4km desde A' } },
+      { id: 3, type: 'task', position: { x: -10, y: 4 }, 
+        data: { value: 4, customTitle: 'C: Sur', customDescription: 'Ciudad C - Transporte 4km desde A' } },
       
-      { id: 4, type: 'number', position: { x: -5, y: -2 }, 
-        data: { value: 3, customTitle: 'D: Centro-N', customDescription: 'Ciudad D - Hub central norte' } },
+      { id: 4, type: 'task', position: { x: -5, y: -2 }, 
+        data: { value: 3, customTitle: 'D: Centro-N', customDescription: 'Ciudad D - Hub norte (3km desde B)' } },
       
-      { id: 5, type: 'number', position: { x: -5, y: -6 }, 
-        data: { value: 7, customTitle: 'E: Extremo N', customDescription: 'Ciudad E - 7km desde B' } },
+      { id: 5, type: 'task', position: { x: -5, y: -6 }, 
+        data: { value: 7, customTitle: 'E: Extremo N', customDescription: 'Ciudad E - Transporte 7km desde B' } },
       
-      { id: 6, type: 'number', position: { x: -5, y: 6 }, 
-        data: { value: 2, customTitle: 'F: Extremo S', customDescription: 'Ciudad F - 2km desde C' } },
+      { id: 6, type: 'task', position: { x: -5, y: 6 }, 
+        data: { value: 2, customTitle: 'F: Extremo S', customDescription: 'Ciudad F - Transporte 2km desde C' } },
       
-      { id: 7, type: 'number', position: { x: 0, y: -2 }, 
-        data: { value: 4, customTitle: 'G: Centro-E', customDescription: 'Ciudad G - Hub central este' } },
+      { id: 7, type: 'task', position: { x: 0, y: -2 }, 
+        data: { value: 4, customTitle: 'G: Centro-E', customDescription: 'Ciudad G - Hub este (4km desde D)' } },
       
-      { id: 8, type: 'number', position: { x: 0, y: 4 }, 
-        data: { value: 3, customTitle: 'H: Este', customDescription: 'Ciudad H - Zona este' } },
+      { id: 8, type: 'task', position: { x: 0, y: 4 }, 
+        data: { value: 3, customTitle: 'H: Este', customDescription: 'Ciudad H - Transporte 3km desde F' } },
       
-      { id: 9, type: 'number', position: { x: 5, y: 0 }, 
-        data: { value: 4, customTitle: 'I: Pre-Puerto', customDescription: 'Ciudad I - Antesala del puerto' } },
+      { id: 9, type: 'task', position: { x: 5, y: 0 }, 
+        data: { value: 4, customTitle: 'I: Pre-Puerto', customDescription: 'Ciudad I - Transporte 4km desde H' } },
       
-      { id: 10, type: 'number', position: { x: 10, y: 0 }, 
-        data: { value: 3, customTitle: 'J: PUERTO', customDescription: 'Ciudad J - Puerto de Exportación' } },
+      { id: 10, type: 'task', position: { x: 10, y: 0 }, 
+        data: { value: 3, customTitle: 'J: PUERTO', customDescription: 'Ciudad J - Puerto Exportación (3km desde I)' } },
       
       { id: 11, type: 'display', position: { x: 14, y: 0 }, 
         data: { customDescription: '✅ Carga Entregada' } }
@@ -426,44 +426,44 @@ export const defaultTemplates: WorkflowTemplate[] = [
       { id: 0, type: 'info-panel', position: { x: -22, y: -14 }, 
         data: { customDescription: '🏭 MACROPROCESO MULTI-PLANTA (4 PLANTAS, 13 ESTACIONES)\n\nProblema: Optimizar flujo desde Recepción hasta Almacén Central atravesando red industrial compleja.\n\nA* = Dijkstra + Heurística Inteligente\nf(n) = g(n) + h(n)\n• g(n) = costo real acumulado\n• h(n) = estimación optimista al objetivo\n\nVENTAJA: A* explora MENOS nodos que Dijkstra manteniendo optimalidad.' } },
       
-      // NODOS (13 estaciones)
-      { id: 1, type: 'number', position: { x: -16, y: 0 }, 
+      // ACTIVIDADES DEL MACROPROCESO (nodos tipo TASK)
+      { id: 1, type: 'task', position: { x: -16, y: 0 }, 
         data: { value: 0, customTitle: '📦 RECEPCIÓN', customDescription: 'Recepción Materia Prima - INICIO' } },
       
       // PLANTA NORTE
-      { id: 2, type: 'number', position: { x: -12, y: -4 }, 
+      { id: 2, type: 'task', position: { x: -12, y: -4 }, 
         data: { value: 2, customTitle: 'Norte: Prep', customDescription: 'Planta Norte - Preparación (2h)' } },
       
-      { id: 3, type: 'number', position: { x: -8, y: -4 }, 
+      { id: 3, type: 'task', position: { x: -8, y: -4 }, 
         data: { value: 3, customTitle: 'Norte: Corte', customDescription: 'Planta Norte - Corte CNC (3h)' } },
       
       // PLANTA SUR
-      { id: 4, type: 'number', position: { x: -12, y: 4 }, 
+      { id: 4, type: 'task', position: { x: -12, y: 4 }, 
         data: { value: 5, customTitle: 'Sur: Prep', customDescription: 'Planta Sur - Preparación (5h)' } },
       
-      { id: 5, type: 'number', position: { x: -8, y: 4 }, 
+      { id: 5, type: 'task', position: { x: -8, y: 4 }, 
         data: { value: 4, customTitle: 'Sur: Soldadura', customDescription: 'Planta Sur - Soldadura (4h)' } },
       
-      { id: 6, type: 'number', position: { x: -4, y: 4 }, 
+      { id: 6, type: 'task', position: { x: -4, y: 4 }, 
         data: { value: 2, customTitle: 'Sur: Ensamble', customDescription: 'Planta Sur - Ensamble (2h)' } },
       
       // TRANSFER
-      { id: 7, type: 'number', position: { x: -8, y: 0 }, 
+      { id: 7, type: 'task', position: { x: -8, y: 0 }, 
         data: { value: 6, customTitle: 'Transfer Este', customDescription: 'Transferencia Norte→Este (6h)' } },
       
       // PLANTA ESTE
-      { id: 8, type: 'number', position: { x: -4, y: -2 }, 
+      { id: 8, type: 'task', position: { x: -4, y: -2 }, 
         data: { value: 5, customTitle: 'Este: Ensamble', customDescription: 'Planta Este - Ensamble Principal (5h)' } },
       
-      { id: 9, type: 'number', position: { x: 0, y: -2 }, 
+      { id: 9, type: 'task', position: { x: 0, y: -2 }, 
         data: { value: 2, customTitle: 'Este: Control', customDescription: 'Planta Este - Control Calidad (2h)' } },
       
       // PLANTA OESTE
-      { id: 10, type: 'number', position: { x: 4, y: 0 }, 
+      { id: 10, type: 'task', position: { x: 4, y: 0 }, 
         data: { value: 4, customTitle: 'Oeste: Empaque', customDescription: 'Planta Oeste - Empaque Final (4h)' } },
       
       // DESTINO
-      { id: 11, type: 'number', position: { x: 8, y: 0 }, 
+      { id: 11, type: 'task', position: { x: 8, y: 0 }, 
         data: { value: 1, customTitle: '🏬 ALMACÉN', customDescription: 'Almacén Central - DESTINO' } },
       
       { id: 12, type: 'display', position: { x: 12, y: 0 }, 
