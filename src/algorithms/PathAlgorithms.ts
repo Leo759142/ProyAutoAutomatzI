@@ -44,6 +44,12 @@ function buildWeightedGraphForPath(editor: NodeEditor): Map<number, GraphNode> {
     
     // Agregar aristas con pesos de las CONEXIONES
     console.log('🔗 Procesando', editor.links.length, 'conexiones');
+    console.log('📋 templateConnections disponible:', !!editor.templateConnections);
+    if (editor.templateConnections) {
+        console.log('📋 Total templateConnections:', editor.templateConnections.length);
+        console.log('📋 Ejemplo templateConnections[0]:', JSON.stringify(editor.templateConnections[0]));
+    }
+    
     editor.links.forEach((link, linkIndex) => {
         if (!link || !link[0] || !link[1]) {
             console.log(`  ⏭️ Conexión ${linkIndex} es null/invalida`);
@@ -70,8 +76,18 @@ function buildWeightedGraphForPath(editor: NodeEditor): Map<number, GraphNode> {
         // Peso de la CONEXIÓN (de templateConnections si existe)
         let weight = 1; // Peso por defecto
         
-        if (editor.templateConnections && editor.templateConnections[linkIndex]?.weight !== undefined) {
-            weight = editor.templateConnections[linkIndex].weight;
+        if (editor.templateConnections && editor.templateConnections[linkIndex]) {
+            const connData = editor.templateConnections[linkIndex];
+            console.log(`  🔍 templateConnections[${linkIndex}]:`, JSON.stringify(connData));
+            
+            if (connData.weight !== undefined) {
+                weight = connData.weight;
+                console.log(`  💰 Peso encontrado: ${weight}`);
+            } else {
+                console.log(`  ⚠️ NO hay weight en templateConnections[${linkIndex}]`);
+            }
+        } else {
+            console.log(`  ⚠️ templateConnections[${linkIndex}] no existe`);
         }
         
         const graphNode = graph.get(fromIndex);
