@@ -410,7 +410,7 @@ export const defaultTemplates: WorkflowTemplate[] = [
         data: { value: 4, customTitle: 'Sur: Soldadura', customDescription: 'Planta Sur - Soldadura (4h)' } },
       
       { id: 6, type: 'task', position: { x: -4, y: 4 }, 
-        data: { value: 2, customTitle: 'Sur: Ensamble', customDescription: 'Planta Sur - Ensamble (2h)' } },
+        data: { customTitle: 'Sur: Ensamble', customDescription: 'Planta Sur - Ensamble (2h)' } },
       
       // TRANSFER
       { id: 7, type: 'task', position: { x: -8, y: 0 }, 

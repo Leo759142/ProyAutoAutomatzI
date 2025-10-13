@@ -25,16 +25,10 @@ export interface GraphNode {
 function buildWeightedGraphForPath(editor: NodeEditor): Map<number, GraphNode> {
     const graph = new Map<number, GraphNode>();
     
-    console.log('🔨 buildWeightedGraphForPath - Total nodos:', editor.nodes.length);
-    
     // Crear nodos del grafo (filtrar info-panel que es NO-nodo)
     editor.nodes.forEach((node, index) => {
-        if (node.type === 'info-panel') {
-            console.log(`  ⏭️ Ignorando info-panel en índice ${index}`);
-            return; // Ignorar NO-nodos
-        }
+        if (node.type === 'info-panel') return; // Ignorar NO-nodos
         
-        console.log(`  ✅ Agregando nodo ${index}: ${node.customTitle || node.type}`);
         graph.set(index, {
             id: index,
             node: node,
@@ -43,65 +37,34 @@ function buildWeightedGraphForPath(editor: NodeEditor): Map<number, GraphNode> {
     });
     
     // Agregar aristas con pesos de las CONEXIONES
-    console.log('🔗 Procesando', editor.links.length, 'conexiones');
-    console.log('📋 templateConnections disponible:', !!editor.templateConnections);
-    if (editor.templateConnections) {
-        console.log('📋 Total templateConnections:', editor.templateConnections.length);
-        console.log('📋 Ejemplo templateConnections[0]:', JSON.stringify(editor.templateConnections[0]));
-    }
-    
     editor.links.forEach((link, linkIndex) => {
-        if (!link || !link[0] || !link[1]) {
-            console.log(`  ⏭️ Conexión ${linkIndex} es null/invalida`);
-            return;
-        }
+        if (!link || !link[0] || !link[1]) return;
         
         const fromIndex = editor.nodes.indexOf(link[0].parent);
         const toIndex = editor.nodes.indexOf(link[1].parent);
         
-        if (fromIndex === -1 || toIndex === -1) {
-            console.log(`  ❌ Conexión ${linkIndex}: fromIndex=${fromIndex}, toIndex=${toIndex} (inválidos)`);
-            return;
-        }
+        if (fromIndex === -1 || toIndex === -1) return;
         
         const fromNode = link[0].parent;
         const toNode = link[1].parent;
         
         // Ignorar conexiones con info-panel
-        if (fromNode.type === 'info-panel' || toNode.type === 'info-panel') {
-            console.log(`  ⏭️ Conexión ${linkIndex} con info-panel ignorada`);
-            return;
-        }
+        if (fromNode.type === 'info-panel' || toNode.type === 'info-panel') return;
         
         // Peso de la CONEXIÓN (de templateConnections si existe)
         let weight = 1; // Peso por defecto
         
         if (editor.templateConnections && editor.templateConnections[linkIndex]) {
             const connData = editor.templateConnections[linkIndex];
-            console.log(`  🔍 templateConnections[${linkIndex}]:`, JSON.stringify(connData));
-            
             if (connData.weight !== undefined) {
                 weight = connData.weight;
-                console.log(`  💰 Peso encontrado: ${weight}`);
-            } else {
-                console.log(`  ⚠️ NO hay weight en templateConnections[${linkIndex}]`);
             }
-        } else {
-            console.log(`  ⚠️ templateConnections[${linkIndex}] no existe`);
         }
         
         const graphNode = graph.get(fromIndex);
         if (graphNode) {
-            console.log(`  ✅ Edge: ${fromIndex} → ${toIndex} (weight: ${weight})`);
             graphNode.edges.push({ target: toIndex, weight });
-        } else {
-            console.log(`  ❌ No se encontró nodo ${fromIndex} en el grafo`);
         }
-    });
-    
-    console.log('📊 Grafo final:', graph.size, 'nodos');
-    graph.forEach((node, id) => {
-        console.log(`  Nodo ${id}: ${node.edges.length} edges`);
     });
     
     return graph;
@@ -156,7 +119,6 @@ function buildWeightedGraphForPERT(editor: NodeEditor): Map<number, GraphNode> {
  * Un nodo es sumidero si solo se conecta a display nodes
  */
 function findSourceAndSink(editor: NodeEditor): { sources: number[]; sinks: number[] } {
-    console.log('🔍 findSourceAndSink - Analizando', editor.nodes.length, 'nodos');
     const hasIncoming = new Set<number>();
     const hasOutgoingToNonDisplay = new Set<number>();
     
@@ -210,18 +172,20 @@ export function dijkstra(editor: NodeEditor, startIndex?: number, endIndex?: num
     const graph = buildWeightedGraphForPath(editor);
     const { sources, sinks } = findSourceAndSink(editor);
     
-    console.log('🔍 Dijkstra - Análisis inicial:');
-    console.log('  📊 Nodos totales:', graph.size);
-    console.log('  🟢 Nodos fuente:', sources.length, sources.map(i => editor.nodes[i]?.customTitle || `Node ${i}`));
-    console.log('  🔴 Nodos sumidero:', sinks.length, sinks.map(i => editor.nodes[i]?.customTitle || `Node ${i}`));
-    console.log('  📍 Nodos en grafo:', Array.from(graph.keys()));
+    console.log('🔍 DIJKSTRA DEBUG:');
+    console.log('  📊 Graph size:', graph.size);
+    console.log('  📊 Graph keys:', Array.from(graph.keys()));
+    console.log('  🟢 Sources:', sources);
+    console.log('  🔴 Sinks:', sinks);
     
     // Si no se especifica inicio/fin, usar primer source y primer sink
     const start = startIndex !== undefined ? startIndex : sources[0];
     const end = endIndex !== undefined ? endIndex : sinks[0];
     
-    console.log('  🎯 Start:', start, editor.nodes[start]?.customTitle);
-    console.log('  🏁 End:', end, editor.nodes[end]?.customTitle);
+    console.log('  🎯 Start index:', start, '→', editor.nodes[start]?.customTitle);
+    console.log('  🏁 End index:', end, '→', editor.nodes[end]?.customTitle);
+    console.log('  ✅ Start in graph?', graph.has(start));
+    console.log('  ✅ End in graph?', graph.has(end));
     
     if (start === undefined || end === undefined) {
         return {
@@ -231,15 +195,14 @@ export function dijkstra(editor: NodeEditor, startIndex?: number, endIndex?: num
         };
     }
     
-    if (!graph.has(start) || !graph.has(end)) {
-        console.log('  ❌ Start en grafo:', graph.has(start));
-        console.log('  ❌ End en grafo:', graph.has(end));
-        return {
-            algorithm: 'Dijkstra',
-            success: false,
-            message: `❌ Índices de nodos inválidos. Start: ${start}, End: ${end}`
-        };
-    }
+    // Mostrar estructura del grafo
+    console.log('  📊 Graph edges:');
+    graph.forEach((node, id) => {
+        if (node.edges.length > 0) {
+            console.log(`    ${id} (${editor.nodes[id]?.customTitle}):`, 
+                node.edges.map(e => `→${e.target}(w:${e.weight})`).join(', '));
+        }
+    });
     
     // Inicialización
     const distances = new Map<number, number>();
