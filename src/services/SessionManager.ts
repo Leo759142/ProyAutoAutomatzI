@@ -1,19 +1,15 @@
 // SessionManager.ts
-// Administrador de sesiones para el canvas con persistencia Redis
+// Administrador de sesiones para el canvas (sin Redis, solo autosave a templates)
 
 import { NodeEditor } from '../core/NodeEditor';
-import { RedisService, SessionData } from './RedisService';
 import { logAudit } from '../main';
 
 export class SessionManager {
   private static instance: SessionManager;
-  private redisService: RedisService;
   private nodeEditor: NodeEditor | null = null;
   private autoSaveInterval: number | null = null;
 
-  private constructor() {
-    this.redisService = RedisService.getInstance();
-  }
+  private constructor() {}
 
   public static getInstance(): SessionManager {
     if (!SessionManager.instance) {
@@ -24,7 +20,6 @@ export class SessionManager {
 
   public setNodeEditor(editor: NodeEditor): void {
     this.nodeEditor = editor;
-    this.loadPreviousSession();
     this.startAutoSave();
   }
 
@@ -33,88 +28,90 @@ export class SessionManager {
       clearInterval(this.autoSaveInterval);
     }
     
-    // Auto-guardar cada 10 segundos
+    // Auto-guardar cada 30 segundos SOLO si hay un template seleccionado
     this.autoSaveInterval = window.setInterval(() => {
       this.saveCurrentSession();
-    }, 10000);
+    }, 30000);
     
-    logAudit('🔄 Auto-guardado iniciado (cada 10s)');
+    logAudit('🔄 Auto-guardado iniciado (cada 30s, solo con template seleccionado)');
   }
 
   public async saveCurrentSession(): Promise<void> {
     if (!this.nodeEditor) return;
 
     try {
-      // Solo guardar si hay nodos para evitar sobrescribir con datos vacíos
+      // Solo autosave si hay un template seleccionado
+      const templateSelect = document.getElementById('templateSelect') as HTMLSelectElement;
+      if (!templateSelect || !templateSelect.value) {
+        return; // No logear si no hay template seleccionado (ruido innecesario)
+      }
+
+      // Solo guardar si hay nodos
       if (this.nodeEditor.nodes.length === 0) {
-        logAudit('ℹ️ No hay nodos que guardar');
         return;
       }
 
-      const sessionData: SessionData = {
-        nodes: this.nodeEditor.nodes.map((node, index) => ({
-          id: (node as any).id || `node_${index}`,
-          type: node.type,
-          pos: { x: node.pos.x, y: node.pos.y },
-          data: {
-            ...(((node as any).value !== undefined) ? { value: (node as any).value } : {}),
-            ...(node.customTitle !== null ? { customTitle: node.customTitle } : {}),
-            ...(node.customDescription !== null ? { customDescription: node.customDescription } : {})
-          }
-        })),
-        connections: this.nodeEditor.links
-          .map((link, index) => {
-            if (!link || !link[0] || !link[1]) return null;
-            return {
-              from: { node: (link[0].parent as any).id || index.toString(), pin: link[0].name },
-              to: { node: (link[1].parent as any).id || index.toString(), pin: link[1].name }
-            };
-          })
-          .filter(conn => conn !== null),
-        viewOffset: { x: this.nodeEditor.viewOffset.x, y: this.nodeEditor.viewOffset.y },
-        scale: this.nodeEditor.scale,
-        timestamp: Date.now()
-      };
+      const templateId = Number(templateSelect.value);
+      if (!templateId) return;
 
-      await this.redisService.saveSession(sessionData);
-      logAudit(`💾 Sesión guardada: ${sessionData.nodes.length} nodos, ${sessionData.connections.length} conexiones`);
+      // Obtener DatabaseService desde window (expuesto en main.ts)
+      const dbService = (window as any).dbService;
+      if (!dbService) {
+        console.error('DatabaseService no disponible para autosave');
+        return;
+      }
+
+      // Preparar datos de nodos
+      const nodesData = this.nodeEditor.nodes.map((node, index) => ({
+        id: index + 1,
+        type: node.type,
+        position: { x: node.pos.x, y: node.pos.y },
+        data: {
+          ...(node.outputs.length > 0 && node.outputs[0].value !== undefined ? { value: node.outputs[0].value } : {}),
+          ...(node.customTitle !== null ? { customTitle: node.customTitle } : {}),
+          ...(node.customDescription !== null ? { customDescription: node.customDescription } : {})
+        }
+      }));
+
+      // Preparar datos de conexiones
+      const connectionsData = this.nodeEditor.links
+        .map((link) => {
+          if (!link || !link[0] || !link[1]) return null;
+          const fromNodeIndex = this.nodeEditor!.nodes.indexOf(link[0].parent);
+          const toNodeIndex = this.nodeEditor!.nodes.indexOf(link[1].parent);
+          return {
+            from: { node: fromNodeIndex + 1, pin: link[0].index },
+            to: { node: toNodeIndex + 1, pin: link[1].index }
+          };
+        })
+        .filter(conn => conn !== null);
+
+      // Cargar template actual para mantener nombre/descripción
+      const template = await dbService.loadTemplate(templateId);
+      if (!template) return;
+
+      // Actualizar template con el contenido actual del canvas
+      await dbService.updateTemplate(templateId, {
+        name: template.name,
+        description: template.description,
+        problemDescription: template.problemDescription,
+        nodes_data: JSON.stringify(nodesData),
+        connections_data: JSON.stringify(connectionsData)
+      });
+
+      logAudit(`💾 Autosave: "${template.name}" actualizado (${nodesData.length} nodos)`);
     } catch (error) {
-      logAudit(`❌ Error guardando sesión: ${error}`);
-      console.error('Error guardando sesión:', error);
+      console.error('Error en autosave:', error);
     }
   }
 
   public async loadPreviousSession(): Promise<void> {
-    if (!this.nodeEditor) return;
-
-    try {
-      const sessionData = await this.redisService.loadSession();
-      if (sessionData && sessionData.nodes.length > 0) {
-        logAudit(`🔄 Cargando sesión: ${sessionData.nodes.length} nodos`);
-        
-        // Cargar como template usando el método correcto
-        this.nodeEditor.loadWorkflowTemplate({
-          nodes_data: JSON.stringify(sessionData.nodes),
-          connections_data: JSON.stringify(sessionData.connections)
-        });
-        
-        // Restaurar vista
-        this.nodeEditor.viewOffset.x = sessionData.viewOffset.x;
-        this.nodeEditor.viewOffset.y = sessionData.viewOffset.y;
-        this.nodeEditor.scale = sessionData.scale;
-        
-        logAudit('✅ Sesión previa restaurada');
-      } else {
-        logAudit('ℹ️ No hay sesión previa que cargar');
-      }
-    } catch (error) {
-      logAudit(`❌ Error cargando sesión: ${error}`);
-    }
+    // No-op: Sin Redis, no hay sesión previa que cargar
+    // Los templates se cargan manualmente desde el selector
   }
 
   public async clearSession(): Promise<void> {
-    await this.redisService.clearSession();
-    logAudit('🗑️ Sesión eliminada');
+    // No-op: Sin Redis, no hay sesión que limpiar
   }
 
   public stopAutoSave(): void {
