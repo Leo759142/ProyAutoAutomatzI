@@ -18,12 +18,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // Inicializar la UI modular del canvas
   const canvasUI = initCanvasUI();
   
-  // Inicializar el administrador de sesiones con persistencia Redis
+  // Inicializar base de datos y guardar templates por defecto
+  const dbService = DatabaseService.getInstance();
+  
+  // Exponer dbService globalmente para SessionManager
+  (window as any).dbService = dbService;
+  
+  // Inicializar el administrador de sesiones (autosave a templates)
   const sessionManager = SessionManager.getInstance();
   sessionManager.setNodeEditor(canvasUI.editor);
 
-  // Inicializar base de datos y guardar templates por defecto
-  const dbService = DatabaseService.getInstance();
   dbService.initialize().then(async () => {
     const existingTemplates = await dbService.listTemplates();
     const existingNames = existingTemplates.map(t => t.name);
@@ -236,10 +240,15 @@ document.addEventListener('DOMContentLoaded', () => {
           if (!link || !link[0] || !link[1]) return null;
           const fromNodeIndex = canvasUI.editor.nodes.indexOf(link[0].parent);
           const toNodeIndex = canvasUI.editor.nodes.indexOf(link[1].parent);
-          return {
+          const conn: any = {
             from: { node: fromNodeIndex + 1, pin: link[0].index },
             to: { node: toNodeIndex + 1, pin: link[1].index }
           };
+          // Incluir weight si existe en templateConnections
+          if (canvasUI.editor.templateConnections && canvasUI.editor.templateConnections[index]?.weight !== undefined) {
+            conn.weight = canvasUI.editor.templateConnections[index].weight;
+          }
+          return conn;
         })
         .filter(conn => conn !== null);
       
@@ -296,10 +305,15 @@ document.addEventListener('DOMContentLoaded', () => {
           if (!link || !link[0] || !link[1]) return null;
           const fromNodeIndex = canvasUI.editor.nodes.indexOf(link[0].parent);
           const toNodeIndex = canvasUI.editor.nodes.indexOf(link[1].parent);
-          return {
+          const conn: any = {
             from: { node: fromNodeIndex + 1, pin: link[0].index },
             to: { node: toNodeIndex + 1, pin: link[1].index }
           };
+          // Incluir weight si existe en templateConnections
+          if (canvasUI.editor.templateConnections && canvasUI.editor.templateConnections[index]?.weight !== undefined) {
+            conn.weight = canvasUI.editor.templateConnections[index].weight;
+          }
+          return conn;
         })
         .filter(conn => conn !== null);
       

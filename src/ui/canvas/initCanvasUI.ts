@@ -9,6 +9,7 @@ import * as CanvasEvents from './CanvasEvents';
 import { Vec2, InputState } from '../../types/types';
 import { Pin } from '../../core/Node';
 import { PropertiesPanel } from '../PropertiesPanel';
+import { ConnectionPropertiesPanel } from '../ConnectionPropertiesPanel';
 
 export function initCanvasUI() {
   // Overlay input for editing node values
@@ -160,6 +161,7 @@ export function initCanvasUI() {
   const selection = new CanvasSelection();
   const execution = new CanvasExecution(editor);
   const propertiesPanel = new PropertiesPanel(editor); // ✅ Pasar editor al panel
+  const connectionPropertiesPanel = new ConnectionPropertiesPanel(editor); // ✅ Panel para conexiones
   let isMoveMode = false;
   let lastTime = 0;
   let keys: Set<string> = new Set();
@@ -259,6 +261,70 @@ export function initCanvasUI() {
     screenToWorld: screenToWorldLocal, worldToScreen: worldToScreenLocal, updateOverlay: updateOverlayLocal, toggleMoveMode,
     NodeEditor, Node: editor.constructor, Vec2: editor.viewOffset.constructor, propertiesPanel
   }, e));
+  
+  // Clic derecho en canvas (para editar conexiones)
+  canvas.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    
+    const rect = canvas.getBoundingClientRect();
+    const mouseScreen = new Vec2(e.clientX - rect.left, e.clientY - rect.top);
+    const mouseWorld = screenToWorldLocal(mouseScreen);
+    
+    // Buscar si el clic fue sobre una conexión
+    let clickedConnection: [number, any] | null = null;
+    const clickThreshold = 0.3; // Distancia máxima para considerar un clic en la línea
+    
+    editor.links.forEach((link, index) => {
+      if (!link || !link[0] || !link[1]) return;
+      
+      const p1 = link[0].pos;
+      const p2 = link[1].pos;
+      
+      // Calcular distancia del punto a la línea (simplificado)
+      const dist = pointToLineDistance(mouseWorld, p1, p2);
+      
+      if (dist < clickThreshold) {
+        clickedConnection = [index, link];
+      }
+    });
+    
+    if (clickedConnection) {
+      const [index, connection] = clickedConnection;
+      connectionPropertiesPanel.show(connection, index);
+    }
+  });
+  
+  // Función auxiliar para calcular distancia de un punto a una línea
+  function pointToLineDistance(point: Vec2, lineStart: Vec2, lineEnd: Vec2): number {
+    const A = point.x - lineStart.x;
+    const B = point.y - lineStart.y;
+    const C = lineEnd.x - lineStart.x;
+    const D = lineEnd.y - lineStart.y;
+    
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+    let param = -1;
+    
+    if (lenSq !== 0) param = dot / lenSq;
+    
+    let xx, yy;
+    
+    if (param < 0) {
+      xx = lineStart.x;
+      yy = lineStart.y;
+    } else if (param > 1) {
+      xx = lineEnd.x;
+      yy = lineEnd.y;
+    } else {
+      xx = lineStart.x + param * C;
+      yy = lineStart.y + param * D;
+    }
+    
+    const dx = point.x - xx;
+    const dy = point.y - yy;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  
   // Manejo de teclas direccionales
   window.addEventListener('keydown', (e) => {
     // Movimiento diagonal y por teclas direccionales

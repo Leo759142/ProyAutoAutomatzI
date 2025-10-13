@@ -53,6 +53,7 @@ export class NodeEditor {
 
       const nodesData = JSON.parse(template.nodes_data);
       const connectionsData = JSON.parse(template.connections_data);
+      this.templateConnections = connectionsData;
       
   logAudit(`📦 Total de nodos a cargar: ${nodesData.length}`);
   console.log(`📦 Total de nodos a cargar: ${nodesData.length}`);
@@ -266,6 +267,9 @@ export class NodeEditor {
   viewOffset: Vec2 = new Vec2();
   scale: number = 1.0;
   isRunning: boolean = false;
+  
+  // Conexiones con metadata (weight, etc.)
+  public templateConnections: any[] = [];
   
   // Sistema de plugins
   public pluginManager: ExecutionPluginManager = new ExecutionPluginManager();
@@ -941,11 +945,15 @@ export class NodeEditor {
   }
 
   private renderLinks(ctx: CanvasRenderingContext2D) {
-    // ✅ FIX: Empezar desde 0 para renderizar TODAS las conexiones
     for (let i = 0; i < this.links.length; i++) {
       const link = this.links[i];
       if (link && link[0] && link[1]) {
-        this.drawBezierLink(ctx, link[0].pos, link[1].pos);
+        // Buscar el peso en la conexión original
+        let weight = undefined;
+        if (this.templateConnections && this.templateConnections[i] && this.templateConnections[i].weight !== undefined) {
+          weight = this.templateConnections[i].weight;
+        }
+        this.drawBezierLink(ctx, link[0].pos, link[1].pos, false, weight);
       }
     }
   }
@@ -954,7 +962,7 @@ export class NodeEditor {
     // No hay líneas temporales en el sistema click-click
   }
 
-  private drawBezierLink(ctx: CanvasRenderingContext2D, p1: Vec2, p2: Vec2, isTemp: boolean = false) {
+  private drawBezierLink(ctx: CanvasRenderingContext2D, p1: Vec2, p2: Vec2, isTemp: boolean = false, weight?: number) {
     const dx = p2.x - p1.x;
     ctx.beginPath();
     ctx.moveTo(p1.x, p1.y);
@@ -966,6 +974,18 @@ export class NodeEditor {
     ctx.strokeStyle = `rgba(204, 153, 51, ${isTemp ? 0.5 : 1.0})`;
     ctx.lineWidth = 0.1;
     ctx.stroke();
+    // Dibujar el peso si existe
+    if (weight !== undefined) {
+      // Calcular punto medio de la curva
+      const mx = (p1.x + p2.x) / 2;
+      const my = (p1.y + p2.y) / 2;
+      ctx.save();
+      ctx.font = 'bold 0.18px Montserrat, Segoe UI, Roboto, Arial, sans-serif';
+      ctx.fillStyle = 'rgb(0,188,212)';
+      ctx.textAlign = 'center';
+      ctx.fillText(weight.toString(), mx, my - 0.12);
+      ctx.restore();
+    }
   }
 
   private renderNodes(ctx: CanvasRenderingContext2D) {
@@ -1137,11 +1157,14 @@ export class NodeEditor {
           ctx.fillText(`= ${displayText}`, node.pos.x, node.pos.y + 0.23);
         }
       } else if (node.type === 'task') {
-        // Nodo TASK - mostrar duración y datos PERT
-        const duration = node.outputs[0]?.value ?? 1;
-        ctx.fillStyle = 'rgb(0, 188, 212)'; // Cyan
-        ctx.font = "bold 0.22px 'Montserrat', 'Segoe UI', 'Roboto', Arial, sans-serif";
-        ctx.fillText(`⏱ ${duration}d`, node.pos.x, node.pos.y + 0.23);
+        // Nodo TASK - mostrar duración SOLO si existe (peso opcional)
+        const duration = node.outputs[0]?.value;
+        if (duration !== undefined && typeof duration === 'number' && duration > 0) {
+          ctx.fillStyle = 'rgb(0, 188, 212)'; // Cyan
+          ctx.font = "bold 0.22px 'Montserrat', 'Segoe UI', 'Roboto', Arial, sans-serif";
+          ctx.fillText(`⏱ ${duration}`, node.pos.x, node.pos.y + 0.23);
+        }
+        // Si no tiene duration, no muestra nada (nodo sin peso)
         
         // Mostrar ES/EF/LS/LF si están calculados
         if (node.userData?.pertData) {
