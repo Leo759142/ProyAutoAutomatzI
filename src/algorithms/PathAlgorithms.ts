@@ -120,7 +120,7 @@ function buildWeightedGraphForPERT(editor: NodeEditor): Map<number, GraphNode> {
  */
 function findSourceAndSink(editor: NodeEditor): { sources: number[]; sinks: number[] } {
     const hasIncoming = new Set<number>();
-    const hasOutgoingToNonDisplay = new Set<number>();
+    const hasOutgoing = new Set<number>(); // Cualquier salida
     
     editor.links.forEach(link => {
         if (!link || !link[0] || !link[1]) return;
@@ -133,14 +133,14 @@ function findSourceAndSink(editor: NodeEditor): { sources: number[]; sinks: numb
         // Ignorar conexiones con info-panel
         if (fromNode.type === 'info-panel' || toNode.type === 'info-panel') return;
         
-        // Marcar nodos con entradas (excepto desde info-panel)
+        // Marcar nodos con entradas
         if (toIndex !== -1 && toNode.type !== 'display') {
             hasIncoming.add(toIndex);
         }
         
-        // Marcar nodos con salidas hacia nodos NO-display
-        if (fromIndex !== -1 && toNode.type !== 'display' && toNode.type !== 'info-panel') {
-            hasOutgoingToNonDisplay.add(fromIndex);
+        // Marcar CUALQUIER nodo con salidas (incluso a display)
+        if (fromIndex !== -1 && fromNode.type !== 'display') {
+            hasOutgoing.add(fromIndex);
         }
     });
     
@@ -156,9 +156,21 @@ function findSourceAndSink(editor: NodeEditor): { sources: number[]; sinks: numb
             sources.push(index);
         }
         
-        // Nodo sumidero: no tiene salidas significativas (solo a display o nada)
-        if (!hasOutgoingToNonDisplay.has(index)) {
+        // Nodo sumidero: no tiene salidas O solo tiene salida a display
+        // Para detectar correctamente, buscamos nodos que tengan salidas pero NO a otros nodos procesables
+        if (!hasOutgoing.has(index)) {
             sinks.push(index);
+        } else {
+            // Verificar si TODAS sus salidas son a display
+            const outgoingLinks = editor.links.filter(link => 
+                link && link[0] && link[0].parent === node
+            );
+            const allToDisplay = outgoingLinks.every(link => 
+                link[1] && link[1].parent.type === 'display'
+            );
+            if (allToDisplay && outgoingLinks.length > 0) {
+                sinks.push(index);
+            }
         }
     });
     
