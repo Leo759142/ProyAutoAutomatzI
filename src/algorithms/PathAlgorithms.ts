@@ -511,7 +511,7 @@ export function pertCPM(editor: NodeEditor): PathResult {
         });
     }
     
-    // Calcular holgura y encontrar ruta crítica
+    // Calcular holgura (primero sin marcar como crítico)
     const slack = new Map<number, number>();
     const criticalNodes: number[] = [];
     
@@ -523,20 +523,6 @@ export function pertCPM(editor: NodeEditor): PathResult {
         
         if (Math.abs(nodeSlack) < 0.001) { // Considerar 0 con tolerancia
             criticalNodes.push(id);
-        }
-        
-        // Guardar datos PERT en el nodo para visualización
-        const node = editor.nodes[id];
-        if (node) {
-            if (!node.userData) node.userData = {};
-            node.userData.pertData = {
-                ES: es,
-                EF: EF.get(id) || 0,
-                LS: ls,
-                LF: LF.get(id) || 0,
-                slack: nodeSlack,
-                isCritical: Math.abs(nodeSlack) < 0.001
-            };
         }
     });
     
@@ -596,6 +582,29 @@ export function pertCPM(editor: NodeEditor): PathResult {
     const totalTime = maxEF;
     const pathNames = criticalPath.map(i => editor.nodes[i]?.customTitle || editor.nodes[i]?.type || `Node ${i}`);
     
+    // Convertir criticalPath a Set para verificación rápida
+    const criticalPathSet = new Set(criticalPath);
+    
+    // Ahora marcar SOLO los nodos del camino crítico en userData
+    graph.forEach((_, id) => {
+        const node = editor.nodes[id];
+        if (node) {
+            if (!node.userData) node.userData = {};
+            const es = ES.get(id) || 0;
+            const ls = LS.get(id) || 0;
+            const nodeSlack = ls - es;
+            
+            node.userData.pertData = {
+                ES: es,
+                EF: EF.get(id) || 0,
+                LS: ls,
+                LF: LF.get(id) || 0,
+                slack: nodeSlack,
+                isCritical: criticalPathSet.has(id) // Solo los del camino crítico
+            };
+        }
+    });
+    
     // Crear tabla de detalles
     const details: any[] = [];
     graph.forEach((node, id) => {
@@ -607,7 +616,7 @@ export function pertCPM(editor: NodeEditor): PathResult {
             LS: LS.get(id) || 0,
             LF: LF.get(id) || 0,
             slack: slack.get(id) || 0,
-            isCritical: Math.abs(slack.get(id) || 0) < 0.001
+            isCritical: criticalPathSet.has(id) // Solo los del camino crítico
         });
     });
     
