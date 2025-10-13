@@ -286,6 +286,22 @@ if (highlight && isOptimalPath) {
 
 ---
 
+## 📚 Documentación Adicional
+
+Para **soluciones detalladas paso a paso** con análisis completo de los algoritmos Dijkstra y A*, consultar:
+
+📄 **[SOLUCIONES_DIJKSTRA_ASTAR.md](./SOLUCIONES_DIJKSTRA_ASTAR.md)**
+
+Este documento incluye:
+- 🔍 Ejecución paso a paso de Dijkstra (tabla completa)
+- ⭐ Ejecución paso a paso de A* con heurística
+- 📊 Comparación exhaustiva Dijkstra vs A*
+- 🎯 Análisis de complejidad algorítmica
+- 🧪 Checklist de verificación de resultados
+- 📈 Grafos visuales y tablas de distancias
+
+---
+
 **Fecha**: 2025-10-12  
 **Versión**: 2.0.0  
 **Autor**: GitHub Copilot  
