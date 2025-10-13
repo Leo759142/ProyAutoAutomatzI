@@ -540,12 +540,57 @@ export function pertCPM(editor: NodeEditor): PathResult {
         }
     });
     
-    // Construir camino crítico
+    // Construir camino crítico (siguiendo las conexiones reales)
     const criticalPath: number[] = [];
+    const criticalNodesSet = new Set(criticalNodes);
+    
     if (criticalNodes.length > 0) {
-        // Ordenar nodos críticos por ES
-        criticalNodes.sort((a, b) => (ES.get(a) || 0) - (ES.get(b) || 0));
-        criticalPath.push(...criticalNodes);
+        // Encontrar el camino más largo entre nodos críticos
+        // Comenzar desde los nodos fuente críticos
+        const criticalSources = sources.filter(s => criticalNodesSet.has(s));
+        
+        if (criticalSources.length > 0) {
+            // DFS para encontrar el camino crítico más largo
+            let longestPath: number[] = [];
+            
+            const dfs = (nodeId: number, path: number[], visited: Set<number>) => {
+                path.push(nodeId);
+                visited.add(nodeId);
+                
+                // Si llegamos a un sumidero crítico, comparar longitud
+                if (sinks.includes(nodeId) && criticalNodesSet.has(nodeId)) {
+                    if (path.length > longestPath.length) {
+                        longestPath = [...path];
+                    }
+                }
+                
+                // Explorar vecinos críticos
+                const currentNode = graph.get(nodeId);
+                if (currentNode) {
+                    currentNode.edges.forEach(edge => {
+                        if (criticalNodesSet.has(edge.target) && !visited.has(edge.target)) {
+                            dfs(edge.target, path, visited);
+                        }
+                    });
+                }
+                
+                path.pop();
+                visited.delete(nodeId);
+            };
+            
+            // Probar desde cada fuente crítica
+            criticalSources.forEach(source => {
+                dfs(source, [], new Set());
+            });
+            
+            criticalPath.push(...longestPath);
+        }
+        
+        // Si no se encontró camino, usar todos los nodos críticos ordenados
+        if (criticalPath.length === 0) {
+            criticalNodes.sort((a, b) => (ES.get(a) || 0) - (ES.get(b) || 0));
+            criticalPath.push(...criticalNodes);
+        }
     }
     
     const totalTime = maxEF;
