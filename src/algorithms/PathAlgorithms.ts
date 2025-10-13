@@ -52,17 +52,18 @@ function buildWeightedGraph(editor: NodeEditor): Map<number, GraphNode> {
         // Ignorar conexiones con info-panel
         if (fromNode.type === 'info-panel' || toNode.type === 'info-panel') return;
         
-        // Peso depende del tipo de nodo
-        let weight = 1;
+        // Peso depende del tipo de nodo (OPCIONAL)
+        let weight = 1; // Peso por defecto si no se especifica
         
         if (toNode.type === 'task') {
-            // Para nodos TASK, el peso es la duración (output 'duration')
+            // Para nodos TASK, el peso es la duración (output 'duration') SI EXISTE
             if (toNode.outputs.length > 0 && toNode.outputs[0].value !== undefined) {
                 const duration = toNode.outputs[0].value;
                 if (typeof duration === 'number' && duration > 0) {
                     weight = duration;
                 }
             }
+            // Si no tiene value, usa peso 1 (sin costo adicional)
         } else if (toNode.outputs.length > 0 && toNode.outputs[0].value !== undefined) {
             // Para otros nodos, usar el valor del output si existe
             const value = toNode.outputs[0].value;
@@ -416,7 +417,9 @@ export function pertCPM(editor: NodeEditor): PathResult {
     // Inicializar nodos fuente
     sources.forEach(source => {
         ES.set(source, 0);
-        const duration = graph.get(source)?.edges[0]?.weight || 0;
+        // La duración es del NODO, no de su edge
+        const node = editor.nodes[source];
+        const duration = (node.type === 'task' && node.outputs[0]?.value) ? node.outputs[0].value : 0;
         EF.set(source, duration);
     });
     
@@ -438,7 +441,10 @@ export function pertCPM(editor: NodeEditor): PathResult {
             // ES[target] = max(ES[target], EF[current])
             if (currentEF > targetES) {
                 ES.set(edge.target, currentEF);
-                EF.set(edge.target, currentEF + edge.weight);
+                // La duración es del NODO TARGET, no del edge
+                const targetNode = editor.nodes[edge.target];
+                const targetDuration = (targetNode.type === 'task' && targetNode.outputs[0]?.value) ? targetNode.outputs[0].value : 0;
+                EF.set(edge.target, currentEF + targetDuration);
             }
             
             // Decrementar in-degree y agregar a queue si es 0
@@ -459,7 +465,9 @@ export function pertCPM(editor: NodeEditor): PathResult {
     const maxEF = Math.max(...Array.from(EF.values()));
     sinks.forEach(sink => {
         LF.set(sink, EF.get(sink) || 0);
-        const duration = graph.get(sink)?.edges[0]?.weight || 0;
+        // La duración es del NODO sink, no de su edge
+        const node = editor.nodes[sink];
+        const duration = (node.type === 'task' && node.outputs[0]?.value) ? node.outputs[0].value : 0;
         LS.set(sink, (LF.get(sink) || 0) - duration);
     });
     
@@ -491,7 +499,9 @@ export function pertCPM(editor: NodeEditor): PathResult {
             // LF[pred] = min(LF[pred], LS[current])
             if (currentLS < predLF) {
                 LF.set(pred, currentLS);
-                const predDuration = graph.get(pred)?.edges.find(e => e.target === current)?.weight || 0;
+                // La duración es del NODO pred, no del edge
+                const predNode = editor.nodes[pred];
+                const predDuration = (predNode.type === 'task' && predNode.outputs[0]?.value) ? predNode.outputs[0].value : 0;
                 LS.set(pred, currentLS - predDuration);
             }
             
