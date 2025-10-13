@@ -92,7 +92,8 @@ export class NodeEditor {
           continue;
         }
 
-        if (!nodeData.id) {
+        // CRÍTICO: verificar si id es undefined o null, NO si es falsy (porque id=0 es válido)
+        if (nodeData.id === undefined || nodeData.id === null) {
           logAudit(`⚠️ Nodo ${nodeData.type} en índice ${i} no tiene ID, usando índice+1`);
           console.warn(`⚠️ Nodo ${nodeData.type} en índice ${i} no tiene ID, usando índice+1`);
           nodeData.id = i + 1;
