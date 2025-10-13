@@ -19,11 +19,83 @@ export interface GraphNode {
 }
 
 /**
- * Convierte el editor de nodos en un grafo con pesos
- * Para nodos tipo 'task', el peso es la duración de la actividad
- * Para otros nodos, el peso es 1 o el valor del output
+ * Convierte el editor de nodos en un grafo con pesos para Dijkstra/A*
+ * Usa los pesos de las CONEXIONES (templateConnections) si existen
  */
-function buildWeightedGraph(editor: NodeEditor): Map<number, GraphNode> {
+function buildWeightedGraphForPath(editor: NodeEditor): Map<number, GraphNode> {
+    const graph = new Map<number, GraphNode>();
+    
+    console.log('🔨 buildWeightedGraphForPath - Total nodos:', editor.nodes.length);
+    
+    // Crear nodos del grafo (filtrar info-panel que es NO-nodo)
+    editor.nodes.forEach((node, index) => {
+        if (node.type === 'info-panel') {
+            console.log(`  ⏭️ Ignorando info-panel en índice ${index}`);
+            return; // Ignorar NO-nodos
+        }
+        
+        console.log(`  ✅ Agregando nodo ${index}: ${node.customTitle || node.type}`);
+        graph.set(index, {
+            id: index,
+            node: node,
+            edges: []
+        });
+    });
+    
+    // Agregar aristas con pesos de las CONEXIONES
+    console.log('🔗 Procesando', editor.links.length, 'conexiones');
+    editor.links.forEach((link, linkIndex) => {
+        if (!link || !link[0] || !link[1]) {
+            console.log(`  ⏭️ Conexión ${linkIndex} es null/invalida`);
+            return;
+        }
+        
+        const fromIndex = editor.nodes.indexOf(link[0].parent);
+        const toIndex = editor.nodes.indexOf(link[1].parent);
+        
+        if (fromIndex === -1 || toIndex === -1) {
+            console.log(`  ❌ Conexión ${linkIndex}: fromIndex=${fromIndex}, toIndex=${toIndex} (inválidos)`);
+            return;
+        }
+        
+        const fromNode = link[0].parent;
+        const toNode = link[1].parent;
+        
+        // Ignorar conexiones con info-panel
+        if (fromNode.type === 'info-panel' || toNode.type === 'info-panel') {
+            console.log(`  ⏭️ Conexión ${linkIndex} con info-panel ignorada`);
+            return;
+        }
+        
+        // Peso de la CONEXIÓN (de templateConnections si existe)
+        let weight = 1; // Peso por defecto
+        
+        if (editor.templateConnections && editor.templateConnections[linkIndex]?.weight !== undefined) {
+            weight = editor.templateConnections[linkIndex].weight;
+        }
+        
+        const graphNode = graph.get(fromIndex);
+        if (graphNode) {
+            console.log(`  ✅ Edge: ${fromIndex} → ${toIndex} (weight: ${weight})`);
+            graphNode.edges.push({ target: toIndex, weight });
+        } else {
+            console.log(`  ❌ No se encontró nodo ${fromIndex} en el grafo`);
+        }
+    });
+    
+    console.log('📊 Grafo final:', graph.size, 'nodos');
+    graph.forEach((node, id) => {
+        console.log(`  Nodo ${id}: ${node.edges.length} edges`);
+    });
+    
+    return graph;
+}
+
+/**
+ * Convierte el editor de nodos en un grafo con pesos para PERT/CPM
+ * Usa la duración de los NODOS (node.outputs[0].value para tasks)
+ */
+function buildWeightedGraphForPERT(editor: NodeEditor): Map<number, GraphNode> {
     const graph = new Map<number, GraphNode>();
     
     // Crear nodos del grafo (filtrar info-panel que es NO-nodo)
@@ -37,7 +109,7 @@ function buildWeightedGraph(editor: NodeEditor): Map<number, GraphNode> {
         });
     });
     
-    // Agregar aristas con pesos
+    // Agregar aristas (sin peso aquí, el peso está en los nodos)
     editor.links.forEach(link => {
         if (!link || !link[0] || !link[1]) return;
         
@@ -52,29 +124,10 @@ function buildWeightedGraph(editor: NodeEditor): Map<number, GraphNode> {
         // Ignorar conexiones con info-panel
         if (fromNode.type === 'info-panel' || toNode.type === 'info-panel') return;
         
-        // Peso depende del tipo de nodo (OPCIONAL)
-        let weight = 1; // Peso por defecto si no se especifica
-        
-        if (toNode.type === 'task') {
-            // Para nodos TASK, el peso es la duración (output 'duration') SI EXISTE
-            if (toNode.outputs.length > 0 && toNode.outputs[0].value !== undefined) {
-                const duration = toNode.outputs[0].value;
-                if (typeof duration === 'number' && duration > 0) {
-                    weight = duration;
-                }
-            }
-            // Si no tiene value, usa peso 1 (sin costo adicional)
-        } else if (toNode.outputs.length > 0 && toNode.outputs[0].value !== undefined) {
-            // Para otros nodos, usar el valor del output si existe
-            const value = toNode.outputs[0].value;
-            if (typeof value === 'number' && value > 0) {
-                weight = value;
-            }
-        }
-        
+        // Para PERT, el peso no importa aquí (se usa la duración del nodo destino)
         const graphNode = graph.get(fromIndex);
         if (graphNode) {
-            graphNode.edges.push({ target: toIndex, weight });
+            graphNode.edges.push({ target: toIndex, weight: 0 }); // Placeholder
         }
     });
     
@@ -87,6 +140,7 @@ function buildWeightedGraph(editor: NodeEditor): Map<number, GraphNode> {
  * Un nodo es sumidero si solo se conecta a display nodes
  */
 function findSourceAndSink(editor: NodeEditor): { sources: number[]; sinks: number[] } {
+    console.log('🔍 findSourceAndSink - Analizando', editor.nodes.length, 'nodos');
     const hasIncoming = new Set<number>();
     const hasOutgoingToNonDisplay = new Set<number>();
     
@@ -137,12 +191,21 @@ function findSourceAndSink(editor: NodeEditor): { sources: number[]; sinks: numb
  * Algoritmo de Dijkstra para encontrar el camino más corto
  */
 export function dijkstra(editor: NodeEditor, startIndex?: number, endIndex?: number): PathResult {
-    const graph = buildWeightedGraph(editor);
+    const graph = buildWeightedGraphForPath(editor);
     const { sources, sinks } = findSourceAndSink(editor);
+    
+    console.log('🔍 Dijkstra - Análisis inicial:');
+    console.log('  📊 Nodos totales:', graph.size);
+    console.log('  🟢 Nodos fuente:', sources.length, sources.map(i => editor.nodes[i]?.customTitle || `Node ${i}`));
+    console.log('  🔴 Nodos sumidero:', sinks.length, sinks.map(i => editor.nodes[i]?.customTitle || `Node ${i}`));
+    console.log('  📍 Nodos en grafo:', Array.from(graph.keys()));
     
     // Si no se especifica inicio/fin, usar primer source y primer sink
     const start = startIndex !== undefined ? startIndex : sources[0];
     const end = endIndex !== undefined ? endIndex : sinks[0];
+    
+    console.log('  🎯 Start:', start, editor.nodes[start]?.customTitle);
+    console.log('  🏁 End:', end, editor.nodes[end]?.customTitle);
     
     if (start === undefined || end === undefined) {
         return {
@@ -153,10 +216,12 @@ export function dijkstra(editor: NodeEditor, startIndex?: number, endIndex?: num
     }
     
     if (!graph.has(start) || !graph.has(end)) {
+        console.log('  ❌ Start en grafo:', graph.has(start));
+        console.log('  ❌ End en grafo:', graph.has(end));
         return {
             algorithm: 'Dijkstra',
             success: false,
-            message: '❌ Índices de nodos inválidos.'
+            message: `❌ Índices de nodos inválidos. Start: ${start}, End: ${end}`
         };
     }
     
@@ -250,7 +315,7 @@ export function dijkstra(editor: NodeEditor, startIndex?: number, endIndex?: num
  * Algoritmo A* con heurística de distancia euclidiana
  */
 export function aStar(editor: NodeEditor, startIndex?: number, endIndex?: number): PathResult {
-    const graph = buildWeightedGraph(editor);
+    const graph = buildWeightedGraphForPath(editor);
     const { sources, sinks } = findSourceAndSink(editor);
     
     const start = startIndex !== undefined ? startIndex : sources[0];
@@ -372,7 +437,7 @@ export function aStar(editor: NodeEditor, startIndex?: number, endIndex?: number
  * Maneja múltiples nodos de inicio y fin correctamente
  */
 export function pertCPM(editor: NodeEditor): PathResult {
-    const graph = buildWeightedGraph(editor);
+    const graph = buildWeightedGraphForPERT(editor);
     const { sources, sinks } = findSourceAndSink(editor);
     
     console.log('🔍 PERT/CPM - Análisis inicial:');
