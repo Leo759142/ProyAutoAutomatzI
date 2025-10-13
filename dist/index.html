@@ -36,7 +36,7 @@
     <title>Node Editor - Visual Workflow</title>
     
     <script src="https://sql.js.org/dist/sql-wasm.js"></script>
-  <script type="module" crossorigin src="/ProyAutoAutomatzI/assets/main-7591570f.js"></script>
+  <script type="module" crossorigin src="/ProyAutoAutomatzI/assets/main-cd33b9fa.js"></script>
   <link rel="stylesheet" href="/ProyAutoAutomatzI/assets/index-6b1e843e.css">
 </head>
 <body>
@@ -353,10 +353,12 @@
                                 </ul>
                             </li>
                             <li><strong>Nodo Task:</strong> Representa una actividad con duración configurable</li>
+                            <li><strong>⚠️ Validación automática:</strong> Si aparecen valores ES, EF, LS o LF negativos, significa que el planteamiento tiene errores (ciclos, dependencias mal definidas, duraciones incorrectas)</li>
                         </ul>
                     </div>
                     
                     <div class="help-tip">🎯 <strong>Ejecutar algoritmos:</strong> Botón "🔍 Analizar" → Visualiza rutas óptimas resaltadas en el canvas</div>
+                    <div class="help-tip">⚠️ <strong>Valores negativos:</strong> Indica error en el planteamiento. Revisa conexiones, duraciones y que no haya ciclos</div>
                 </div>
 
                 <div class="help-section">

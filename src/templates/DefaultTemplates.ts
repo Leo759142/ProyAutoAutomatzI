@@ -493,52 +493,44 @@ export const defaultTemplates: WorkflowTemplate[] = [
         data: { customTitle: '📋 LICITACIÓN PÚBLICA', 
                 customDescription: 'Proceso administrativo para contratar proveedor de servicios logísticos. Fórmula PERT: TE = (O + 4M + P) / 6. Las actividades tienen tiempos optimistas, más probables y pesimistas para calcular el tiempo esperado y la varianza del proyecto.' } },
       
-      // INICIO
-      { id: 1, type: 'task', position: { x: -12, y: 0 }, 
-        data: { value: 0, customTitle: '🏁 INICIO', customDescription: 'Inicio del proceso de licitación' } },
+      // Actividad A: Preparación de pliegos (ES=0, EF=4)
+      { id: 1, type: 'task', position: { x: -8, y: 0 }, 
+        data: { value: 4, customTitle: 'A: Preparar Pliegos', customDescription: 'Preparación de documentación. TE=4 días. Actividad CRÍTICA (holgura=0). O=3, M=4, P=5' } },
       
-      // Actividad A: Preparación de pliegos
-      { id: 2, type: 'task', position: { x: -8, y: 0 }, 
-        data: { value: 4, customTitle: 'A: Preparar Pliegos', customDescription: 'Preparación de documentación. TE=4 días. Actividad CRÍTICA (holgura=0)' } },
+      // Actividad B: Publicación (ES=4, EF=7, LS=8, LF=11) - NO CRÍTICA
+      { id: 2, type: 'task', position: { x: -4, y: -4 }, 
+        data: { value: 3, customTitle: 'B: Publicar', customDescription: 'Publicación de licitación. TE=3 días. Holgura=4 días (puede retrasarse). O=2, M=3, P=4' } },
       
-      // Actividad B: Publicación (NO CRÍTICA)
-      { id: 3, type: 'task', position: { x: -4, y: -3 }, 
-        data: { value: 3, customTitle: 'B: Publicar', customDescription: 'Publicación de licitación. TE=3 días. Holgura=4 días (puede retrasarse)' } },
+      // Actividad C: Recepción de propuestas (ES=4, EF=11) - CRÍTICA
+      { id: 3, type: 'task', position: { x: -4, y: 4 }, 
+        data: { value: 7, customTitle: 'C: Recibir Propuestas', customDescription: 'Recepción de ofertas. TE=7 días. Actividad CRÍTICA (holgura=0). O=5, M=7, P=9' } },
       
-      // Actividad C: Recepción de propuestas (CRÍTICA)
-      { id: 4, type: 'task', position: { x: -4, y: 3 }, 
-        data: { value: 7, customTitle: 'C: Recibir Propuestas', customDescription: 'Recepción de ofertas. TE=7 días. Actividad CRÍTICA (holgura=0)' } },
+      // Actividad D: Evaluación (ES=11, EF=15) - CRÍTICA
+      { id: 4, type: 'task', position: { x: 2, y: 0 }, 
+        data: { value: 4, customTitle: 'D: Evaluar', customDescription: 'Evaluación de propuestas. TE=4 días. Actividad CRÍTICA (holgura=0). O=3, M=4, P=5. Requiere B y C' } },
       
-      // Nodo de sincronización antes de D
-      { id: 5, type: 'task', position: { x: 0, y: 0 }, 
-        data: { value: 0, customTitle: '⏸️ Sync B+C', customDescription: 'Punto de sincronización: esperar a que terminen B y C' } },
+      // Actividad E: Firma de contrato (ES=15, EF=17) - CRÍTICA
+      { id: 5, type: 'task', position: { x: 8, y: 0 }, 
+        data: { value: 2, customTitle: 'E: Firmar Contrato', customDescription: 'Firma del contrato final. TE=2 días. Actividad CRÍTICA (holgura=0). O=1, M=2, P=3' } },
       
-      // Actividad D: Evaluación
-      { id: 6, type: 'task', position: { x: 4, y: 0 }, 
-        data: { value: 4, customTitle: 'D: Evaluar', customDescription: 'Evaluación de propuestas. TE=4 días. Actividad CRÍTICA (holgura=0)' } },
-      
-      // Actividad E: Firma de contrato
-      { id: 7, type: 'task', position: { x: 8, y: 0 }, 
-        data: { value: 2, customTitle: 'E: Firmar Contrato', customDescription: 'Firma del contrato final. TE=2 días. Actividad CRÍTICA (holgura=0)' } },
-      
-      // FIN
-      { id: 8, type: 'task', position: { x: 12, y: 0 }, 
-        data: { value: 0, customTitle: '🏆 FIN', customDescription: 'Proceso completado en 17 días esperados' } },
-      
-      { id: 9, type: 'display', position: { x: 16, y: 0 }, 
-        data: { customDescription: '✅ Contrato adjudicado' } }
+      { id: 6, type: 'display', position: { x: 14, y: 0 }, 
+        data: { customDescription: '✅ Contrato adjudicado - Tiempo total: 17 días' } }
     ]),
     connections_data: JSON.stringify([
-      // RUTA CRÍTICA: 1→2→4→5→6→7→8
-      { from: { node: 1, pin: 0 }, to: { node: 2, pin: 0 }, weight: 0 },   // INICIO → A
-      { from: { node: 2, pin: 0 }, to: { node: 3, pin: 0 }, weight: 3 },   // A → B (3 días)
-      { from: { node: 2, pin: 0 }, to: { node: 4, pin: 0 }, weight: 7 },   // A → C (7 días) [CRÍTICA]
-      { from: { node: 3, pin: 0 }, to: { node: 5, pin: 0 }, weight: 0 },   // B → Sync
-      { from: { node: 4, pin: 0 }, to: { node: 5, pin: 0 }, weight: 0 },   // C → Sync [CRÍTICA]
-      { from: { node: 5, pin: 0 }, to: { node: 6, pin: 0 }, weight: 4 },   // Sync → D (4 días) [CRÍTICA]
-      { from: { node: 6, pin: 0 }, to: { node: 7, pin: 0 }, weight: 2 },   // D → E (2 días) [CRÍTICA]
-      { from: { node: 7, pin: 0 }, to: { node: 8, pin: 0 }, weight: 0 },   // E → FIN
-      { from: { node: 8, pin: 0 }, to: { node: 9, pin: 0 } }               // Display
+      // RUTA CRÍTICA: A → C → D → E (17 días)
+      // A es predecesora de B y C
+      { from: { node: 1, pin: 0 }, to: { node: 2, pin: 0 } },   // A → B
+      { from: { node: 1, pin: 0 }, to: { node: 3, pin: 0 } },   // A → C [CRÍTICA]
+      
+      // D requiere que B y C terminen
+      { from: { node: 2, pin: 0 }, to: { node: 4, pin: 0 } },   // B → D
+      { from: { node: 3, pin: 0 }, to: { node: 4, pin: 0 } },   // C → D [CRÍTICA]
+      
+      // E depende de D
+      { from: { node: 4, pin: 0 }, to: { node: 5, pin: 0 } },   // D → E [CRÍTICA]
+      
+      // Display final
+      { from: { node: 5, pin: 0 }, to: { node: 6, pin: 0 } }
     ])
   },
   {
