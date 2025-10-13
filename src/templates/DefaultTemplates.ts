@@ -334,7 +334,7 @@ export const defaultTemplates: WorkflowTemplate[] = [
     nodes_data: JSON.stringify([
       // INFO-PANEL
       { id: 0, type: 'info-panel', position: { x: -20, y: -12 }, 
-        data: { customDescription: '🚚 RED LOGÍSTICA NACIONAL - 10 CIUDADES\n\nProblema: Encontrar ruta más corta desde Ciudad A (Centro Operaciones) hasta Ciudad J (Puerto Exportación).\n\nDijkstra calcula automáticamente los costos acumulados desde el origen usando los pesos de las conexiones.\n\nCada conexión tiene un peso (distancia en km) que Dijkstra usa para encontrar la ruta óptima.' } },
+        data: { customDescription: '🚚 PROBLEMA: Red de Transporte Nacional\n\n📍 SITUACIÓN: La empresa TransNacional debe enviar carga desde su Centro (A) hasta el Puerto (J), pasando por 10 ciudades conectadas por carreteras.\n\n🎯 OBJETIVO: Encontrar la ruta más corta considerando las distancias reales entre ciudades.\n\n⚙️ DIJKSTRA: Explora todas las rutas posibles de manera sistemática, garantizando encontrar el camino mínimo. Ideal cuando necesitas la solución óptima absoluta.' } },
       // NODOS DE CIUDAD (value representa tiempo/costo del nodo)
       { id: 1, type: 'task', position: { x: -15, y: 0 }, data: { value: 0, customTitle: 'A: Centro', customDescription: 'Ciudad A - Centro de Operaciones (INICIO)' } },
       { id: 2, type: 'task', position: { x: -10, y: -4 }, data: { value: 5, customTitle: 'B: Norte', customDescription: 'Ciudad B - 5km desde A' } },
@@ -389,7 +389,7 @@ export const defaultTemplates: WorkflowTemplate[] = [
     nodes_data: JSON.stringify([
       // INFO-PANEL
       { id: 0, type: 'info-panel', position: { x: -22, y: -14 }, 
-        data: { customDescription: '🏭 MACROPROCESO MULTI-PLANTA (4 PLANTAS, 13 ESTACIONES)\n\nProblema: Optimizar flujo desde Recepción hasta Almacén Central atravesando red industrial compleja.\n\nA* = Dijkstra + Heurística Inteligente\nf(n) = g(n) + h(n)\n• g(n) = costo real acumulado\n• h(n) = estimación optimista al objetivo\n\nVENTAJA: A* explora MENOS nodos que Dijkstra manteniendo optimalidad.' } },
+        data: { customDescription: '🏭 PROBLEMA: Proceso Industrial Multi-Planta\n\n📍 SITUACIÓN: MegaIndustrial tiene 4 plantas interconectadas y debe optimizar el flujo productivo desde Recepción hasta Almacén, atravesando 13 estaciones de trabajo.\n\n🎯 OBJETIVO: Encontrar la ruta más eficiente minimizando tiempo total.\n\n⚙️ A-ESTRELLA: Como Dijkstra pero más inteligente. Usa una "intuición" (heurística) para explorar primero las rutas más prometedoras. Encuentra la misma solución óptima pero más rápido.' } },
       
       // ACTIVIDADES DEL MACROPROCESO (nodos tipo TASK)
       { id: 1, type: 'task', position: { x: -16, y: 0 }, 
@@ -463,6 +463,158 @@ export const defaultTemplates: WorkflowTemplate[] = [
       // Final
       { from: { node: 10, pin: 0 }, to: { node: 11, pin: 0 }, weight: 1 }, // Empaque → Almacén (1h)
       { from: { node: 11, pin: 0 }, to: { node: 12, pin: 0 } }  // Display
+    ])
+  },
+  {
+    name: '📋 PERT/CPM: Proceso de Licitación',
+    description: 'Gestión de licitación administrativa con análisis de ruta crítica y tiempos probabilísticos',
+    problemDescription: `🏢 PROBLEMA: Una empresa organiza un proceso de licitación para contratar servicios logísticos.
+
+📊 TIEMPOS ESPERADOS (TE) CALCULADOS CON PERT:
+- A: Preparación de pliegos = 4 días
+- B: Publicación de licitación = 3 días  
+- C: Recepción de propuestas = 7 días
+- D: Evaluación de propuestas = 4 días
+- E: Firma del contrato = 2 días
+
+🎯 RUTA CRÍTICA: A → C → D → E
+⏱️ TIEMPO TOTAL: 17 días
+📈 VARIANZA: 0.777 días²
+📊 PROBABILIDAD: 87.29% de completar en 18 días
+
+💡 INSTRUCCIONES:
+1. Haz click en "🔍 Analizar" para ejecutar PERT/CPM
+2. Las actividades críticas (holgura = 0) se resaltan en verde
+3. La actividad B tiene holgura de 4 días (puede retrasarse sin afectar el proyecto)
+4. Los pesos en las conexiones representan la duración de cada actividad`,
+    nodes_data: JSON.stringify([
+      // Panel de información
+      { id: 0, type: 'info-panel', position: { x: -15, y: 8 }, 
+        data: { customTitle: '📋 LICITACIÓN PÚBLICA', 
+                customDescription: 'Proceso administrativo para contratar proveedor de servicios logísticos. Fórmula PERT: TE = (O + 4M + P) / 6. Las actividades tienen tiempos optimistas, más probables y pesimistas para calcular el tiempo esperado y la varianza del proyecto.' } },
+      
+      // INICIO
+      { id: 1, type: 'task', position: { x: -12, y: 0 }, 
+        data: { value: 0, customTitle: '🏁 INICIO', customDescription: 'Inicio del proceso de licitación' } },
+      
+      // Actividad A: Preparación de pliegos
+      { id: 2, type: 'task', position: { x: -8, y: 0 }, 
+        data: { value: 4, customTitle: 'A: Preparar Pliegos', customDescription: 'Preparación de documentación. TE=4 días. Actividad CRÍTICA (holgura=0)' } },
+      
+      // Actividad B: Publicación (NO CRÍTICA)
+      { id: 3, type: 'task', position: { x: -4, y: -3 }, 
+        data: { value: 3, customTitle: 'B: Publicar', customDescription: 'Publicación de licitación. TE=3 días. Holgura=4 días (puede retrasarse)' } },
+      
+      // Actividad C: Recepción de propuestas (CRÍTICA)
+      { id: 4, type: 'task', position: { x: -4, y: 3 }, 
+        data: { value: 7, customTitle: 'C: Recibir Propuestas', customDescription: 'Recepción de ofertas. TE=7 días. Actividad CRÍTICA (holgura=0)' } },
+      
+      // Nodo de sincronización antes de D
+      { id: 5, type: 'task', position: { x: 0, y: 0 }, 
+        data: { value: 0, customTitle: '⏸️ Sync B+C', customDescription: 'Punto de sincronización: esperar a que terminen B y C' } },
+      
+      // Actividad D: Evaluación
+      { id: 6, type: 'task', position: { x: 4, y: 0 }, 
+        data: { value: 4, customTitle: 'D: Evaluar', customDescription: 'Evaluación de propuestas. TE=4 días. Actividad CRÍTICA (holgura=0)' } },
+      
+      // Actividad E: Firma de contrato
+      { id: 7, type: 'task', position: { x: 8, y: 0 }, 
+        data: { value: 2, customTitle: 'E: Firmar Contrato', customDescription: 'Firma del contrato final. TE=2 días. Actividad CRÍTICA (holgura=0)' } },
+      
+      // FIN
+      { id: 8, type: 'task', position: { x: 12, y: 0 }, 
+        data: { value: 0, customTitle: '🏆 FIN', customDescription: 'Proceso completado en 17 días esperados' } },
+      
+      { id: 9, type: 'display', position: { x: 16, y: 0 }, 
+        data: { customDescription: '✅ Contrato adjudicado' } }
+    ]),
+    connections_data: JSON.stringify([
+      // RUTA CRÍTICA: 1→2→4→5→6→7→8
+      { from: { node: 1, pin: 0 }, to: { node: 2, pin: 0 }, weight: 0 },   // INICIO → A
+      { from: { node: 2, pin: 0 }, to: { node: 3, pin: 0 }, weight: 3 },   // A → B (3 días)
+      { from: { node: 2, pin: 0 }, to: { node: 4, pin: 0 }, weight: 7 },   // A → C (7 días) [CRÍTICA]
+      { from: { node: 3, pin: 0 }, to: { node: 5, pin: 0 }, weight: 0 },   // B → Sync
+      { from: { node: 4, pin: 0 }, to: { node: 5, pin: 0 }, weight: 0 },   // C → Sync [CRÍTICA]
+      { from: { node: 5, pin: 0 }, to: { node: 6, pin: 0 }, weight: 4 },   // Sync → D (4 días) [CRÍTICA]
+      { from: { node: 6, pin: 0 }, to: { node: 7, pin: 0 }, weight: 2 },   // D → E (2 días) [CRÍTICA]
+      { from: { node: 7, pin: 0 }, to: { node: 8, pin: 0 }, weight: 0 },   // E → FIN
+      { from: { node: 8, pin: 0 }, to: { node: 9, pin: 0 } }               // Display
+    ])
+  },
+  {
+    name: '🚚 Dijkstra/A*: Rutas Logísticas',
+    description: 'Optimización de rutas de entrega usando algoritmos Dijkstra y A* con heurística',
+    problemDescription: `🏭 PROBLEMA: Empresa logística optimiza entregas desde almacén (A1) a cliente (A5).
+
+📍 RED DE DISTRIBUCIÓN:
+- A1: Almacén Central (inicio)
+- A2, A3, A4: Puntos de distribución intermedios
+- A5: Cliente final (destino)
+
+⚡ SOLUCIÓN ÓPTIMA:
+🔹 Dijkstra: A1 → A3 → A4 → A5 = 12 minutos
+🔹 A*: A1 → A3 → A4 → A5 = 12 minutos
+✅ Ambos algoritmos encuentran la misma ruta
+
+📊 HEURÍSTICA (distancia estimada a A5):
+- A1: 20 min  |  A2: 15 min  |  A3: 10 min
+- A4: 3 min   |  A5: 0 min
+
+💡 INSTRUCCIONES:
+1. Click en "🔍 Analizar" para ejecutar Dijkstra/A*
+2. La ruta óptima se resalta en verde
+3. Los pesos en las conexiones representan el tiempo de transporte (minutos)
+4. Compara: Dijkstra explora más nodos, A* es más eficiente con la heurística`,
+    nodes_data: JSON.stringify([
+      // Panel de información
+      { id: 0, type: 'info-panel', position: { x: -15, y: -8 }, 
+        data: { customTitle: '🚚 OPTIMIZACIÓN LOGÍSTICA', 
+                customDescription: 'Red de distribución con 5 puntos de entrega. Dijkstra encuentra camino más corto explorando todos los nodos. A* mejora la eficiencia usando heurística (estimación de distancia al destino) para priorizar nodos más prometedores.' } },
+      
+      // A1: Almacén Central (ORIGEN)
+      { id: 1, type: 'task', position: { x: -12, y: 0 }, 
+        data: { value: 0, customTitle: 'A1: Almacén', customDescription: '🏭 Almacén Central - PUNTO DE ORIGEN. Desde aquí salen todas las entregas. Heurística: 20 min estimados a destino' } },
+      
+      // A2: Punto de distribución norte
+      { id: 2, type: 'task', position: { x: -6, y: -4 }, 
+        data: { value: 0, customTitle: 'A2: Norte', customDescription: '📦 Centro de Distribución Norte. Opción alternativa menos eficiente. Heurística: 15 min estimados a destino' } },
+      
+      // A3: Punto de distribución centro
+      { id: 3, type: 'task', position: { x: -6, y: 4 }, 
+        data: { value: 0, customTitle: 'A3: Centro', customDescription: '📦 Centro de Distribución Central. Nodo CLAVE en ruta óptima (5 min desde A1). Heurística: 10 min estimados a destino' } },
+      
+      // A4: Punto de distribución este
+      { id: 4, type: 'task', position: { x: 0, y: 0 }, 
+        data: { value: 0, customTitle: 'A4: Este', customDescription: '📦 Centro Este. Última parada antes del cliente (4 min desde A3). Heurística: 3 min estimados a destino' } },
+      
+      // A5: Cliente Final (DESTINO)
+      { id: 5, type: 'task', position: { x: 6, y: 0 }, 
+        data: { value: 0, customTitle: 'A5: Cliente', customDescription: '🏢 Cliente Final - DESTINO. Entrega completada en tiempo óptimo de 12 minutos. Heurística: 0 min (llegada)' } },
+      
+      { id: 6, type: 'display', position: { x: 12, y: 0 }, 
+        data: { customDescription: '✅ Entrega completada: 12 minutos (A1→A3→A4→A5)' } }
+    ]),
+    connections_data: JSON.stringify([
+      // RUTA ÓPTIMA: A1 → A3 → A4 → A5 (12 min total)
+      
+      // Desde A1 (Almacén)
+      { from: { node: 1, pin: 0 }, to: { node: 2, pin: 0 }, weight: 10 }, // A1 → A2 (10 min) [NO óptima]
+      { from: { node: 1, pin: 0 }, to: { node: 3, pin: 0 }, weight: 5 },  // A1 → A3 (5 min) [ÓPTIMA] ✅
+      
+      // Desde A2 (Norte)
+      { from: { node: 2, pin: 0 }, to: { node: 3, pin: 0 }, weight: 3 },  // A2 → A3 (3 min)
+      { from: { node: 2, pin: 0 }, to: { node: 4, pin: 0 }, weight: 8 },  // A2 → A4 (8 min)
+      
+      // Desde A3 (Centro) - CLAVE EN RUTA ÓPTIMA
+      { from: { node: 3, pin: 0 }, to: { node: 2, pin: 0 }, weight: 3 },  // A3 → A2 (3 min) [retorno]
+      { from: { node: 3, pin: 0 }, to: { node: 4, pin: 0 }, weight: 4 },  // A3 → A4 (4 min) [ÓPTIMA] ✅
+      { from: { node: 3, pin: 0 }, to: { node: 5, pin: 0 }, weight: 10 }, // A3 → A5 (10 min) [directa no óptima]
+      
+      // Desde A4 (Este) - PENÚLTIMO EN RUTA ÓPTIMA
+      { from: { node: 4, pin: 0 }, to: { node: 5, pin: 0 }, weight: 3 },  // A4 → A5 (3 min) [ÓPTIMA] ✅
+      
+      // Display final
+      { from: { node: 5, pin: 0 }, to: { node: 6, pin: 0 } }
     ])
   }
 ]

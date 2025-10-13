@@ -494,6 +494,30 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Botón Reset Highlights
+  const resetHighlightsBtn = document.getElementById('resetHighlights') as HTMLButtonElement;
+  if (resetHighlightsBtn) {
+    resetHighlightsBtn.addEventListener('click', () => {
+      // Limpiar todos los highlights de nodos
+      canvasUI.editor.nodes.forEach(node => {
+        if (node.userData) {
+          // Remover datos de algoritmos
+          delete node.userData.pathHighlight;
+          delete node.userData.isInOptimalPath;
+          delete node.userData.pertData;
+          
+          // Si userData está vacío, eliminarlo completamente
+          if (Object.keys(node.userData).length === 0) {
+            delete node.userData;
+          }
+        }
+      });
+      
+      logAudit('✨ Resaltado de rutas óptimas limpiado');
+      alert('✨ Resaltado de rutas óptimas limpiado correctamente');
+    });
+  }
+
   // Botón Reset Database
   const resetDatabaseBtn = document.getElementById('resetDatabase') as HTMLButtonElement;
   if (resetDatabaseBtn) {

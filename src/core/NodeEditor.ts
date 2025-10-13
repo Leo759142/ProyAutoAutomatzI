@@ -1184,68 +1184,97 @@ export class NodeEditor {
           }
         }
       } else if (node.type === 'info-panel') {
-        // NO-NODO INFO-PANEL - renderizado especial grande
-        const panelWidth = 5.0;
-        const panelHeight = 3.5;
+        // NO-NODO INFO-PANEL - renderizado especial grande y responsivo
+        const description = node.customDescription || node.description || 'Sin descripción';
+        
+        // Calcular tamaño dinámico basado en contenido (sin afectar zoom del canvas)
+        ctx.font = "0.15px 'Montserrat', 'Segoe UI', 'Roboto', Arial, sans-serif";
+        const estimatedLines = Math.ceil(description.length / 45); // ~45 chars por línea
+        const minLines = 6;
+        const maxLines = 10; // Limitar a 10 para evitar overflow
+        const actualLines = Math.max(minLines, Math.min(maxLines, estimatedLines));
+        
+        // Tamaño fijo del panel (no escalar con zoom para evitar distorsión)
+        const panelWidth = 6.5;
+        const panelHeight = Math.min(2.2 + (actualLines * 0.18), 4.5); // Alto fijo limitado
         
         // Fondo del panel con borde destacado
-        ctx.fillStyle = 'rgba(40, 40, 60, 0.95)';
+        ctx.fillStyle = 'rgba(35, 35, 55, 0.96)';
         ctx.strokeStyle = 'rgb(100, 150, 255)';
-        ctx.lineWidth = 0.08;
+        ctx.lineWidth = 0.06;
         ctx.beginPath();
         ctx.roundRect(
           node.pos.x - panelWidth/2, 
           node.pos.y - panelHeight/2, 
           panelWidth, 
           panelHeight, 
-          0.15
+          0.12
         );
         ctx.fill();
         ctx.stroke();
         
-        // Título del panel
-        ctx.fillStyle = 'rgb(100, 200, 255)';
-        ctx.font = "bold 0.35px 'Montserrat', 'Segoe UI', 'Roboto', Arial, sans-serif";
+        // Título del panel más compacto
+        ctx.fillStyle = 'rgb(120, 200, 255)';
+        ctx.font = "bold 0.28px 'Montserrat', 'Segoe UI', 'Roboto', Arial, sans-serif";
         ctx.textAlign = 'center';
-        ctx.fillText('ℹ️ INFORMACIÓN DEL PROBLEMA', node.pos.x, node.pos.y - panelHeight/2 + 0.45);
+        ctx.fillText('📋 INFORMACIÓN', node.pos.x, node.pos.y - panelHeight/2 + 0.35);
         
-        // Descripción del problema
-        const description = node.customDescription || node.description || 'Sin descripción';
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.font = "0.16px 'Montserrat', 'Segoe UI', 'Roboto', Arial, sans-serif";
+        // Descripción del problema con mejor format
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+        ctx.font = "0.15px 'Montserrat', 'Segoe UI', 'Roboto', Arial, sans-serif";
         ctx.textAlign = 'left';
         
-        // Dividir texto en líneas
-        const maxWidth = panelWidth - 0.4;
-        const lineHeight = 0.22;
-        const words = description.split(' ');
+        // Dividir texto en líneas de manera más inteligente
+        const maxWidth = panelWidth - 0.5;
+        const lineHeight = 0.18;
+        const paragraphs = description.split('\n');
         const lines: string[] = [];
-        let currentLine = '';
         
-        for (const word of words) {
-          const testLine = currentLine + (currentLine ? ' ' : '') + word;
-          const metrics = ctx.measureText(testLine);
-          if (metrics.width > maxWidth && currentLine) {
-            lines.push(currentLine);
-            currentLine = word;
-          } else {
-            currentLine = testLine;
+        for (const paragraph of paragraphs) {
+          if (paragraph.trim() === '') {
+            lines.push(''); // Línea vacía para separar párrafos
+            continue;
           }
+          
+          const words = paragraph.split(' ');
+          let currentLine = '';
+          
+          for (const word of words) {
+            const testLine = currentLine + (currentLine ? ' ' : '') + word;
+            const metrics = ctx.measureText(testLine);
+            if (metrics.width > maxWidth && currentLine) {
+              lines.push(currentLine);
+              currentLine = word;
+            } else {
+              currentLine = testLine;
+            }
+          }
+          if (currentLine) lines.push(currentLine);
         }
-        if (currentLine) lines.push(currentLine);
         
-        // Renderizar líneas (máximo 10)
-        let startY = node.pos.y - panelHeight/2 + 0.8;
-        for (let i = 0; i < Math.min(lines.length, 10); i++) {
-          ctx.fillText(lines[i], node.pos.x - panelWidth/2 + 0.2, startY + i * lineHeight);
+        // Renderizar líneas
+        let startY = node.pos.y - panelHeight/2 + 0.6;
+        const maxDisplayLines = Math.floor((panelHeight - 0.8) / lineHeight);
+        for (let i = 0; i < Math.min(lines.length, maxDisplayLines); i++) {
+          const line = lines[i];
+          if (line.trim() === '') continue;
+          if (line.includes('🎯') || line.includes('OBJETIVO')) {
+            ctx.fillStyle = 'rgb(255, 215, 0)';
+          } else if (line.includes('📍') || line.includes('SITUACIÓN')) {
+            ctx.fillStyle = 'rgb(100, 255, 150)';
+          } else if (line.includes('⚙️') || line.includes('DIJKSTRA') || line.includes('A-ESTRELLA')) {
+            ctx.fillStyle = 'rgb(100, 200, 255)';
+          } else {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+          }
+          ctx.fillText(line, node.pos.x - panelWidth/2 + 0.25, startY + i * lineHeight);
         }
-        
         // Indicador si hay más texto
-        if (lines.length > 10) {
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-          ctx.font = "italic 0.14px 'Montserrat', 'Segoe UI', 'Roboto', Arial, sans-serif";
+        if (lines.length > maxDisplayLines) {
+          ctx.fillStyle = 'rgba(255, 200, 100, 0.8)';
+          ctx.font = "italic 0.12px 'Montserrat', 'Segoe UI', 'Roboto', Arial, sans-serif";
           ctx.textAlign = 'center';
-          ctx.fillText('...', node.pos.x, startY + 10 * lineHeight + 0.15);
+          ctx.fillText('⬇️ Desplaza para ver más', node.pos.x, node.pos.y + panelHeight/2 - 0.15);
         }
         
         // NO renderizar pines para info-panel (es un NO-nodo)

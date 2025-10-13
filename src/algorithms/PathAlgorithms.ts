@@ -21,13 +21,16 @@ export interface GraphNode {
 /**
  * Convierte el editor de nodos en un grafo con pesos para Dijkstra/A*
  * Usa los pesos de las CONEXIONES (templateConnections) si existen
+ * 
+ * POLÍTICA: Incluye TODOS los nodos procesables (task, condition, etc.)
+ * pero EXCLUYE info-panel. Display nodes se incluyen pero se marcan como finales.
  */
 function buildWeightedGraphForPath(editor: NodeEditor): Map<number, GraphNode> {
     const graph = new Map<number, GraphNode>();
     
-    // Crear nodos del grafo (filtrar info-panel que es NO-nodo)
+    // Crear nodos del grafo - solo excluir info-panel
     editor.nodes.forEach((node, index) => {
-        if (node.type === 'info-panel') return; // Ignorar NO-nodos
+        if (node.type === 'info-panel') return; // Ignorar info-panel
         
         graph.set(index, {
             id: index,
@@ -37,6 +40,7 @@ function buildWeightedGraphForPath(editor: NodeEditor): Map<number, GraphNode> {
     });
     
     // Agregar aristas con pesos de las CONEXIONES
+    // Solo excluir info-panel, pero permitir display nodes
     editor.links.forEach((link, linkIndex) => {
         if (!link || !link[0] || !link[1]) return;
         
@@ -48,8 +52,10 @@ function buildWeightedGraphForPath(editor: NodeEditor): Map<number, GraphNode> {
         const fromNode = link[0].parent;
         const toNode = link[1].parent;
         
-        // Ignorar conexiones con info-panel
-        if (fromNode.type === 'info-panel' || toNode.type === 'info-panel') return;
+        // Solo ignorar info-panel
+        if (fromNode.type === 'info-panel' || toNode.type === 'info-panel') {
+            return;
+        }
         
         // Peso de la CONEXIÓN (de templateConnections si existe)
         let weight = 1; // Peso por defecto
@@ -89,6 +95,7 @@ function buildWeightedGraphForPERT(editor: NodeEditor): Map<number, GraphNode> {
     });
     
     // Agregar aristas (sin peso aquí, el peso está en los nodos)
+    // Solo ignorar info-panel
     editor.links.forEach(link => {
         if (!link || !link[0] || !link[1]) return;
         
@@ -100,7 +107,7 @@ function buildWeightedGraphForPERT(editor: NodeEditor): Map<number, GraphNode> {
         const fromNode = link[0].parent;
         const toNode = link[1].parent;
         
-        // Ignorar conexiones con info-panel
+        // Solo ignorar info-panel
         if (fromNode.type === 'info-panel' || toNode.type === 'info-panel') return;
         
         // Para PERT, el peso no importa aquí (se usa la duración del nodo destino)
@@ -114,13 +121,16 @@ function buildWeightedGraphForPERT(editor: NodeEditor): Map<number, GraphNode> {
 }
 
 /**
- * Encuentra nodos fuente (sin entradas) y sumidero (sin salidas significativas)
- * Excluye info-panel y display nodes
- * Un nodo es sumidero si solo se conecta a display nodes
+ * Encuentra nodos fuente (sin entradas) y sumidero (sin salidas)
+ * Excluye solo info-panel del análisis
+ * 
+ * POLÍTICA SIMPLE: 
+ * - Source: nodo sin entradas (excepto info-panel)
+ * - Sink: nodo sin salidas O nodo del cual SOLO salen conexiones a display
  */
 function findSourceAndSink(editor: NodeEditor): { sources: number[]; sinks: number[] } {
     const hasIncoming = new Set<number>();
-    const hasOutgoing = new Set<number>(); // Cualquier salida
+    const outgoingConnections = new Map<number, number[]>(); // nodeId -> [target indices]
     
     editor.links.forEach(link => {
         if (!link || !link[0] || !link[1]) return;
@@ -130,17 +140,22 @@ function findSourceAndSink(editor: NodeEditor): { sources: number[]; sinks: numb
         const fromNode = link[0].parent;
         const toNode = link[1].parent;
         
-        // Ignorar conexiones con info-panel
-        if (fromNode.type === 'info-panel' || toNode.type === 'info-panel') return;
+        // Solo ignorar info-panel
+        if (fromNode.type === 'info-panel' || toNode.type === 'info-panel') {
+            return;
+        }
         
         // Marcar nodos con entradas
-        if (toIndex !== -1 && toNode.type !== 'display') {
+        if (toIndex !== -1 && toNode.type !== 'info-panel') {
             hasIncoming.add(toIndex);
         }
         
-        // Marcar CUALQUIER nodo con salidas (incluso a display)
-        if (fromIndex !== -1 && fromNode.type !== 'display') {
-            hasOutgoing.add(fromIndex);
+        // Registrar conexiones salientes
+        if (fromIndex !== -1 && fromNode.type !== 'info-panel') {
+            if (!outgoingConnections.has(fromIndex)) {
+                outgoingConnections.set(fromIndex, []);
+            }
+            outgoingConnections.get(fromIndex)!.push(toIndex);
         }
     });
     
@@ -148,27 +163,26 @@ function findSourceAndSink(editor: NodeEditor): { sources: number[]; sinks: numb
     const sinks: number[] = [];
     
     editor.nodes.forEach((node, index) => {
-        // Ignorar info-panel y display nodes
-        if (node.type === 'info-panel' || node.type === 'display') return;
+        // Ignorar solo info-panel
+        if (node.type === 'info-panel') return;
         
         // Nodo fuente: no tiene entradas
         if (!hasIncoming.has(index)) {
             sources.push(index);
         }
         
-        // Nodo sumidero: no tiene salidas O solo tiene salida a display
-        // Para detectar correctamente, buscamos nodos que tengan salidas pero NO a otros nodos procesables
-        if (!hasOutgoing.has(index)) {
+        // Nodo sumidero: 
+        // 1. No tiene salidas, O
+        // 2. Solo tiene salidas a display nodes
+        const outgoing = outgoingConnections.get(index) || [];
+        if (outgoing.length === 0) {
             sinks.push(index);
         } else {
-            // Verificar si TODAS sus salidas son a display
-            const outgoingLinks = editor.links.filter(link => 
-                link && link[0] && link[0].parent === node
+            // Verificar si todas las salidas son a display
+            const allToDisplay = outgoing.every(targetIdx => 
+                editor.nodes[targetIdx]?.type === 'display'
             );
-            const allToDisplay = outgoingLinks.every(link => 
-                link[1] && link[1].parent.type === 'display'
-            );
-            if (allToDisplay && outgoingLinks.length > 0) {
+            if (allToDisplay) {
                 sinks.push(index);
             }
         }
@@ -179,91 +193,109 @@ function findSourceAndSink(editor: NodeEditor): { sources: number[]; sinks: numb
 
 /**
  * Algoritmo de Dijkstra para encontrar el camino más corto
+ * VERSIÓN SIMPLE QUE SIEMPRE FUNCIONA
  */
 export function dijkstra(editor: NodeEditor, startIndex?: number, endIndex?: number): PathResult {
     const graph = buildWeightedGraphForPath(editor);
-    const { sources, sinks } = findSourceAndSink(editor);
     
-    console.log('🔍 DIJKSTRA DEBUG:');
-    console.log('  📊 Graph size:', graph.size);
-    console.log('  📊 Graph keys:', Array.from(graph.keys()));
-    console.log('  🟢 Sources:', sources);
-    console.log('  🔴 Sinks:', sinks);
-    
-    // Si no se especifica inicio/fin, usar primer source y primer sink
-    const start = startIndex !== undefined ? startIndex : sources[0];
-    const end = endIndex !== undefined ? endIndex : sinks[0];
-    
-    console.log('  🎯 Start index:', start, '→', editor.nodes[start]?.customTitle);
-    console.log('  🏁 End index:', end, '→', editor.nodes[end]?.customTitle);
-    console.log('  ✅ Start in graph?', graph.has(start));
-    console.log('  ✅ End in graph?', graph.has(end));
-    
-    if (start === undefined || end === undefined) {
+    // Si no hay nodos en el grafo
+    if (graph.size === 0) {
         return {
             algorithm: 'Dijkstra',
             success: false,
-            message: '❌ No se encontraron nodos de inicio o fin válidos.'
+            message: '❌ No hay nodos procesables en el grafo.'
         };
     }
+    
+    const graphKeys = Array.from(graph.keys());
+    console.log('🔍 DIJKSTRA - Nodos disponibles:', graphKeys.map(i => `${i}:${editor.nodes[i]?.customTitle || editor.nodes[i]?.type}`));
+    
+    // SIMPLE: usar primer y último nodo si no se especifica
+    let start = startIndex !== undefined ? startIndex : graphKeys[0];
+    let end = endIndex !== undefined ? endIndex : graphKeys[graphKeys.length - 1];
+    
+    // Si start y end son iguales, buscar otro end
+    if (start === end && graphKeys.length > 1) {
+        end = graphKeys.find(k => k !== start) || start;
+    }
+    
+    console.log(`  🚀 EJECUTANDO: ${start} (${editor.nodes[start]?.customTitle}) → ${end} (${editor.nodes[end]?.customTitle})`);
     
     // Mostrar estructura del grafo
     console.log('  📊 Graph edges:');
     graph.forEach((node, id) => {
-        if (node.edges.length > 0) {
-            console.log(`    ${id} (${editor.nodes[id]?.customTitle}):`, 
-                node.edges.map(e => `→${e.target}(w:${e.weight})`).join(', '));
-        }
+        const title = editor.nodes[id]?.customTitle || editor.nodes[id]?.type || `Node ${id}`;
+        console.log(`    ${id} (${title}):`, 
+            node.edges.length > 0 ? node.edges.map(e => `→${e.target}(w:${e.weight})`).join(', ') : '(no edges)');
     });
     
     // Inicialización
     const distances = new Map<number, number>();
     const previous = new Map<number, number | null>();
-    const unvisited = new Set<number>();
+    const visited = new Set<number>();
     
+    // Inicializar todas las distancias a infinito excepto el nodo start
     graph.forEach((_, id) => {
         distances.set(id, Infinity);
         previous.set(id, null);
-        unvisited.add(id);
     });
     distances.set(start, 0);
     
-    // Algoritmo de Dijkstra
-    while (unvisited.size > 0) {
+    console.log(`  🔢 Initialized ${graph.size} nodes, start distance = 0`);
+    
+    // Algoritmo de Dijkstra simplificado
+    for (let i = 0; i < graph.size; i++) {
         // Encontrar nodo no visitado con menor distancia
         let current: number | undefined;
         let minDist = Infinity;
         
-        unvisited.forEach(nodeId => {
-            const dist = distances.get(nodeId) || Infinity;
-            if (dist < minDist) {
+        distances.forEach((dist, nodeId) => {
+            if (!visited.has(nodeId) && dist < minDist) {
                 minDist = dist;
                 current = nodeId;
             }
         });
         
-        if (current === undefined || minDist === Infinity) break;
+        if (current === undefined || minDist === Infinity) {
+            console.log(`  ⏹️ No more reachable nodes (iteration ${i})`);
+            break;
+        }
         
-        unvisited.delete(current);
+        visited.add(current);
+        console.log(`  ✅ Visiting node ${current} (${editor.nodes[current]?.customTitle}) with distance ${minDist}`);
         
         // Si llegamos al destino, podemos terminar
-        if (current === end) break;
+        if (current === end) {
+            console.log('  🎯 Reached destination!');
+            break;
+        }
         
         // Actualizar distancias de vecinos
         const currentNode = graph.get(current);
-        if (!currentNode) continue;
-        
-        currentNode.edges.forEach(edge => {
-            if (!unvisited.has(edge.target)) return;
-            
-            const newDist = (distances.get(current!) || 0) + edge.weight;
-            const oldDist = distances.get(edge.target) || Infinity;
-            
-            if (newDist < oldDist) {
-                distances.set(edge.target, newDist);
-                previous.set(edge.target, current!);
-            }
-        });
+        if (currentNode) {
+            currentNode.edges.forEach(edge => {
+                if (visited.has(edge.target)) return;
+                
+                const newDist = minDist + edge.weight;
+                const oldDist = distances.get(edge.target) || Infinity;
+                
+                if (newDist < oldDist) {
+                    distances.set(edge.target, newDist);
+                    previous.set(edge.target, current!);
+                    console.log(`    📝 Updated node ${edge.target}: distance=${newDist}, previous=${current}`);
+                }
+            });
+        }
+    }
+    
+    // Verificar si el destino es alcanzable
+    const finalDistance = distances.get(end) || Infinity;
+    if (finalDistance === Infinity) {
+        return {
+            algorithm: 'Dijkstra',
+            success: false,
+            message: `❌ No hay camino de ${start} (${editor.nodes[start]?.customTitle}) a ${end} (${editor.nodes[end]?.customTitle})`
+        };
     }
     
     // Reconstruir camino
@@ -272,15 +304,17 @@ export function dijkstra(editor: NodeEditor, startIndex?: number, endIndex?: num
     
     while (current !== null) {
         path.unshift(current);
+        if (current === start) break;
         current = previous.get(current) || null;
     }
     
-    // Verificar si se encontró camino
-    if (path[0] !== start) {
+    console.log('  🛤️ Final path:', path.map(i => `${i}:${editor.nodes[i]?.customTitle}`));
+    
+    if (path[0] !== start || path[path.length - 1] !== end) {
         return {
             algorithm: 'Dijkstra',
             success: false,
-            message: `❌ No existe camino entre nodo ${start} y nodo ${end}.`
+            message: `❌ Error en reconstrucción del camino`
         };
     }
     
@@ -307,16 +341,37 @@ export function dijkstra(editor: NodeEditor, startIndex?: number, endIndex?: num
  */
 export function aStar(editor: NodeEditor, startIndex?: number, endIndex?: number): PathResult {
     const graph = buildWeightedGraphForPath(editor);
-    const { sources, sinks } = findSourceAndSink(editor);
     
-    const start = startIndex !== undefined ? startIndex : sources[0];
-    const end = endIndex !== undefined ? endIndex : sinks[0];
-    
-    if (start === undefined || end === undefined) {
+    // Si no hay nodos en el grafo
+    if (graph.size === 0) {
         return {
             algorithm: 'A*',
             success: false,
-            message: '❌ No se encontraron nodos de inicio o fin válidos.'
+            message: '❌ No hay nodos procesables en el grafo.'
+        };
+    }
+    
+    const graphKeys = Array.from(graph.keys());
+    console.log('🔍 A* - Nodos disponibles:', graphKeys.map(i => `${i}:${editor.nodes[i]?.customTitle || editor.nodes[i]?.type}`));
+    
+    // SIMPLE: usar primer y último nodo si no se especifica
+    let start = startIndex !== undefined ? startIndex : graphKeys[0];
+    let end = endIndex !== undefined ? endIndex : graphKeys[graphKeys.length - 1];
+    
+    // Si start y end son iguales, buscar otro end
+    if (start === end && graphKeys.length > 1) {
+        end = graphKeys.find(k => k !== start) || start;
+    }
+    
+    console.log(`  🚀 A* EJECUTANDO: ${start} (${editor.nodes[start]?.customTitle}) → ${end} (${editor.nodes[end]?.customTitle})`);
+    
+    if (start === end) {
+        return {
+            algorithm: 'A*',
+            success: true,
+            path: [start],
+            distance: 0,
+            message: `✅ Nodo de inicio y destino son el mismo: ${editor.nodes[start]?.customTitle}\nDistancia: 0`
         };
     }
     
@@ -565,6 +620,43 @@ export function pertCPM(editor: NodeEditor): PathResult {
                 reverseQueue.push(pred);
             }
         });
+    }
+    
+    // ⚠️ VALIDACIÓN: Detectar valores negativos que indican error en el planteamiento
+    const negativeNodes: string[] = [];
+    graph.forEach((_, id) => {
+        const es = ES.get(id) || 0;
+        const ef = EF.get(id) || 0;
+        const ls = LS.get(id) || 0;
+        const lf = LF.get(id) || 0;
+        const nodeName = editor.nodes[id]?.customTitle || editor.nodes[id]?.type || `Node ${id}`;
+        
+        if (es < 0 || ef < 0 || ls < 0 || lf < 0) {
+            negativeNodes.push(`${nodeName} (ES:${es.toFixed(2)}, EF:${ef.toFixed(2)}, LS:${ls.toFixed(2)}, LF:${lf.toFixed(2)})`);
+        }
+    });
+    
+    // Si hay valores negativos, retornar error
+    if (negativeNodes.length > 0) {
+        return {
+            algorithm: 'PERT/CPM',
+            success: false,
+            message: `❌ ERROR en el planteamiento del proyecto PERT/CPM:\n\n` +
+                     `Se detectaron valores negativos en los cálculos, lo que indica:\n` +
+                     `• Dependencias circulares o mal definidas\n` +
+                     `• Duraciones de tareas incorrectas\n` +
+                     `• Relaciones de precedencia inconsistentes\n\n` +
+                     `Nodos con valores negativos:\n${negativeNodes.map(n => `  • ${n}`).join('\n')}\n\n` +
+                     `⚡ SOLUCIÓN:\n` +
+                     `  1. Verifica que las conexiones sigan el flujo lógico correcto\n` +
+                     `  2. Asegúrate de que no haya ciclos en el grafo\n` +
+                     `  3. Revisa que todas las duraciones sean valores positivos\n` +
+                     `  4. Confirma que las dependencias (predecesores) sean correctas`,
+            details: {
+                invalidNodes: negativeNodes,
+                errorType: 'NEGATIVE_VALUES'
+            }
+        };
     }
     
     // Calcular holgura (primero sin marcar como crítico)

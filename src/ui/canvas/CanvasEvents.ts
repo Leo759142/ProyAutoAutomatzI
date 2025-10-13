@@ -386,7 +386,7 @@ export function handleMouseUp(manager: any, e: MouseEvent) {
 }
 
 export function handleDblClick(manager: any, e: MouseEvent) {
-  // Evento de doble clic: abrir panel de propiedades del nodo
+  // Evento de doble clic: abrir panel de propiedades del nodo o editar peso de conexión
   e.preventDefault();
   e.stopPropagation();
   
@@ -399,7 +399,76 @@ export function handleDblClick(manager: any, e: MouseEvent) {
   console.log('🖱️ DOBLE-CLICK en pantalla:', { screenX: x, screenY: y });
   console.log('🌍 Coordenadas mundo:', { worldX: worldPos.x.toFixed(2), worldY: worldPos.y.toFixed(2) });
 
-  // Buscar el nodo bajo el cursor usando detección por rectángulo (más preciso)
+  // PRIMERO: Verificar si el doble click fue en una línea de conexión
+  try {
+    const { getClosestLink } = require('./CanvasUtils');
+    const closestLink = getClosestLink(worldPos, manager.editor.links, 0.4); // Radio más amplio para edición
+    
+    if (closestLink) {
+      console.log('✏️ DOBLE-CLICK detectado en línea de conexión');
+      console.log('🔍 Link encontrado:', closestLink);
+      
+      const linkIndex = closestLink.index;
+      const [fromPin, toPin] = closestLink.link;
+      
+      if (!fromPin || !toPin) {
+        console.error('❌ Error: pins no válidos en la conexión');
+        return;
+      }
+      
+      // Obtener peso actual
+      let currentWeight = 1;
+      if (manager.editor.templateConnections && 
+          manager.editor.templateConnections[linkIndex] && 
+          manager.editor.templateConnections[linkIndex].weight !== undefined) {
+        currentWeight = manager.editor.templateConnections[linkIndex].weight;
+      }
+      
+      console.log(`📊 Peso actual: ${currentWeight}`);
+      
+      // Mostrar prompt para editar peso
+      const promptMsg = `Editar peso de conexión:\n${fromPin.parent.title} → ${toPin.parent.title}\n\nPeso actual: ${currentWeight}`;
+      const newWeight = prompt(promptMsg, currentWeight.toString());
+      
+      console.log('💬 Respuesta del usuario:', newWeight);
+      
+      if (newWeight !== null && !isNaN(Number(newWeight)) && newWeight.trim() !== '') {
+        const weightValue = Number(newWeight);
+        
+        // Actualizar peso en templateConnections
+        if (!manager.editor.templateConnections) {
+          manager.editor.templateConnections = [];
+        }
+        if (!manager.editor.templateConnections[linkIndex]) {
+          manager.editor.templateConnections[linkIndex] = {};
+        }
+        manager.editor.templateConnections[linkIndex].weight = weightValue;
+        
+        console.log(`✅ Peso actualizado: ${fromPin.parent.title} → ${toPin.parent.title} = ${weightValue}`);
+        
+        // Log en auditoría
+        const logAudit = (window as any).logAudit;
+        if (logAudit) {
+          logAudit(`✏️ Peso editado: ${fromPin.parent.title} → ${toPin.parent.title} = ${weightValue}`);
+        } else {
+          console.log('📝 Auditoría: Peso editado');
+        }
+        
+        // Recomputar y redibujar
+        manager.editor.computeAll();
+        console.log('🔄 Recomputando y redibujando canvas');
+      } else {
+        console.log('❌ Edición cancelada o valor inválido');
+      }
+      return;
+    } else {
+      console.log('🔍 No se encontró línea de conexión cerca del click');
+    }
+  } catch (error) {
+    console.error('❌ Error en edición de peso:', error);
+  }
+
+  // SEGUNDO: Buscar el nodo bajo el cursor usando detección por rectángulo (más preciso)
   let foundNode = null;
   let minDistance = Infinity;
   

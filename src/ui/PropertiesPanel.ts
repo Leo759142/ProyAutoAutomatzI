@@ -128,8 +128,40 @@ export class PropertiesPanel {
       this.renderPinControls(inputPropertiesContainer);
     }
 
-    // Si el nodo no tiene inputs, mostrar OUTPUT editable (para nodos de entrada)
-    if (this.currentNode.inputs.length === 0 && this.currentNode.outputs.length > 0) {
+    // Renderizar cada input como propiedad editable
+    if (this.currentNode.inputs.length > 0) {
+      this.currentNode.inputs.forEach((pin, index) => {
+        const propertyGroup = document.createElement('div');
+        propertyGroup.className = 'property-group';
+
+        const label = document.createElement('label');
+        label.textContent = `${pin.name}:`;
+        propertyGroup.appendChild(label);
+
+        const inputDiv = document.createElement('div');
+        inputDiv.className = 'property-input';
+
+        // Crear input según el tipo de pin
+        const input = this.createInputElement(pin.type, pin.value);
+        input.dataset.pinIndex = index.toString();
+        input.dataset.pinType = 'input';
+        this.inputElements.set(index, input);
+
+        inputDiv.appendChild(input);
+
+        // Agregar hint según el tipo
+        const hint = document.createElement('div');
+        hint.className = 'input-hint';
+        hint.textContent = this.getHintForType(pin.type);
+        inputDiv.appendChild(hint);
+
+        propertyGroup.appendChild(inputDiv);
+        inputPropertiesContainer.appendChild(propertyGroup);
+      });
+    }
+
+    // Renderizar outputs editables (para nodos de entrada y nodos especiales como Task)
+    if (this.currentNode.outputs.length > 0) {
       this.currentNode.outputs.forEach((pin, index) => {
         const propertyGroup = document.createElement('div');
         propertyGroup.className = 'property-group';
@@ -144,7 +176,9 @@ export class PropertiesPanel {
         // Crear input según el tipo de pin
         const input = this.createInputElement(pin.type, pin.value);
         input.dataset.pinIndex = index.toString();
-        this.inputElements.set(index, input);
+        input.dataset.pinType = 'output';
+        // Usar índice desplazado para outputs para evitar conflictos
+        this.inputElements.set(1000 + index, input);
 
         inputDiv.appendChild(input);
 
@@ -157,37 +191,7 @@ export class PropertiesPanel {
         propertyGroup.appendChild(inputDiv);
         inputPropertiesContainer.appendChild(propertyGroup);
       });
-      return;
     }
-
-    // Renderizar cada input como propiedad editable
-    this.currentNode.inputs.forEach((pin, index) => {
-      const propertyGroup = document.createElement('div');
-      propertyGroup.className = 'property-group';
-
-      const label = document.createElement('label');
-      label.textContent = `${pin.name}:`;
-      propertyGroup.appendChild(label);
-
-      const inputDiv = document.createElement('div');
-      inputDiv.className = 'property-input';
-
-      // Crear input según el tipo de pin
-      const input = this.createInputElement(pin.type, pin.value);
-      input.dataset.pinIndex = index.toString();
-      this.inputElements.set(index, input);
-
-      inputDiv.appendChild(input);
-
-      // Agregar hint según el tipo
-      const hint = document.createElement('div');
-      hint.className = 'input-hint';
-      hint.textContent = this.getHintForType(pin.type);
-      inputDiv.appendChild(hint);
-
-      propertyGroup.appendChild(inputDiv);
-      inputPropertiesContainer.appendChild(propertyGroup);
-    });
   }
 
   /**
@@ -262,53 +266,43 @@ export class PropertiesPanel {
       this.currentNode.customDescription = newDescription || null;
     }
 
-    if (this.currentNode!.inputs.length === 0 && this.currentNode!.outputs.length > 0) {
-      // Editar OUTPUT si no hay inputs
-      this.inputElements.forEach((inputElement, pinIndex) => {
-        const pin = this.currentNode!.outputs[pinIndex];
-        if (!pin) return;
-        switch (pin.type) {
-          case PinType.Number:
-            if (inputElement.value.trim() === '') {
-              // Si el campo está vacío, NO modificar el valor
-              break;
-            }
-            const numValue = parseFloat(inputElement.value);
-            pin.value = isNaN(numValue) ? pin.value : numValue;
+    // Procesar todos los elementos de input (tanto inputs como outputs)
+    this.inputElements.forEach((inputElement, key) => {
+      const pinType = inputElement.dataset.pinType;
+      const pinIndex = parseInt(inputElement.dataset.pinIndex || '0');
+      
+      let pin = null;
+      if (pinType === 'output') {
+        // Es un output (key >= 1000)
+        pin = this.currentNode!.outputs[pinIndex];
+      } else {
+        // Es un input
+        pin = this.currentNode!.inputs[pinIndex];
+      }
+      
+      if (!pin) return;
+      
+      // Aplicar el valor según el tipo
+      switch (pin.type) {
+        case PinType.Number:
+          if (inputElement.value.trim() === '') {
+            // Si el campo está vacío, NO modificar el valor
             break;
-          case PinType.Boolean:
-            pin.value = (inputElement as HTMLInputElement).checked;
-            break;
-          case PinType.String:
-          case PinType.Custom:
-            pin.value = inputElement.value;
-            break;
-        }
-      });
-    } else {
-      // Editar inputs normalmente
-      this.inputElements.forEach((inputElement, pinIndex) => {
-        const pin = this.currentNode!.inputs[pinIndex];
-        if (!pin) return;
-        switch (pin.type) {
-          case PinType.Number:
-            if (inputElement.value.trim() === '') {
-              // Si el campo está vacío, NO modificar el valor
-              break;
-            }
-            const numValue = parseFloat(inputElement.value);
-            pin.value = isNaN(numValue) ? pin.value : numValue;
-            break;
-          case PinType.Boolean:
-            pin.value = (inputElement as HTMLInputElement).checked;
-            break;
-          case PinType.String:
-          case PinType.Custom:
-            pin.value = inputElement.value;
-            break;
-        }
-      });
-    }
+          }
+          const numValue = parseFloat(inputElement.value);
+          if (!isNaN(numValue)) {
+            pin.value = numValue;
+          }
+          break;
+        case PinType.Boolean:
+          pin.value = (inputElement as HTMLInputElement).checked;
+          break;
+        case PinType.String:
+        case PinType.Custom:
+          pin.value = inputElement.value;
+          break;
+      }
+    });
 
     console.log('✅ Propiedades aplicadas:', {
       node: this.currentNode.title,

@@ -107,6 +107,14 @@
                             </svg>
                             <span>🔄 Reset DB</span>
                         </button>
+                        <button id="resetHighlights" title="Limpiar resaltado de rutas óptimas y datos de algoritmos">
+                            <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="2" fill="none"/>
+                                <path d="M6 10l8 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <path d="M10 6l0 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            <span>✨ Limpiar</span>
+                        </button>
                     </div>
                     <div class="toolbar-group center">
                         <select id="nodeTypeSelect" title="Tipo de nodo">
@@ -168,7 +176,8 @@
         <div class="tools">
             <span class="tool-label">Herramientas:</span>
             <span class="tool-item"><kbd>A</kbd> Añadir nodo</span>
-            <span class="tool-item tool-highlight">🖱️ <strong>DOBLE-CLICK</strong> para editar</span>
+            <span class="tool-item tool-highlight">🖱️ <strong>DOBLE-CLICK</strong> para editar nodo</span>
+            <span class="tool-item tool-highlight">🖱️ <strong>CLICK DERECHO</strong> en conexión para editarla</span>
             <span class="tool-item">🖱️ Click medio para mover</span>
             <span class="tool-item">🖱️ Rueda para zoom</span>
             <span class="tool-item"><kbd>Delete</kbd> Eliminar</span>
@@ -251,12 +260,13 @@
                 <div class="help-section">
                     <h4>2️⃣ CONECTAR NODOS:</h4>
                     <ul>
-                        <li><strong>Paso 1:</strong> Click en pin de SALIDA (círculo derecho)</li>
-                        <li><strong>Paso 2:</strong> Arrastra hasta pin de ENTRADA (círculo izquierdo)</li>
-                        <li><strong>Línea amarilla:</strong> Indica conexión exitosa</li>
-                        <li><strong>Eliminar:</strong> Click derecho en conexión</li>
+                        <li><strong>Crear conexión:</strong> Click en pin de SALIDA → Arrastra hasta pin de ENTRADA</li>
+                        <li><strong>Línea amarilla:</strong> Indica conexión exitosa entre nodos</li>
+                        <li><strong>✏️ Editar peso:</strong> <kbd>Click derecho</kbd> sobre la línea de conexión</li>
+                        <li><strong>🗑️ Eliminar:</strong> Click derecho → Panel → Botón "Eliminar"</li>
                     </ul>
                     <div class="help-tip">⚠️ <strong>Solo se conectan tipos compatibles</strong> (Number→Number, Boolean→Boolean)</div>
+                    <div class="help-tip">💡 <strong>¿No puedes hacer click?</strong> Acércate con zoom para mayor precisión</div>
                 </div>
 
                 <div class="help-section">
@@ -283,7 +293,74 @@
                 </div>
 
                 <div class="help-section">
-                    <h4>🔧 CREAR NODOS PERSONALIZADOS:</h4>
+                    <h4>� EDITAR CONEXIONES:</h4>
+                    <ul>
+                        <li><strong>Editar peso:</strong> Click derecho sobre la conexión → Panel lateral</li>
+                        <li><strong>Peso (Weight):</strong> Valor numérico asignado a cada conexión</li>
+                        <li><strong>Uso:</strong> El peso se usa en algoritmos de rutas óptimas y PERT/CPM</li>
+                        <li><strong>Eliminar:</strong> En el panel de conexión → Botón "🗑️ Eliminar"</li>
+                    </ul>
+                    <div class="help-tip">💡 <strong>Sin peso:</strong> Las conexiones sin peso se consideran con valor 1 por defecto</div>
+                </div>
+
+                <div class="help-section">
+                    <h4>🧮 ALGORITMOS DE RUTAS ÓPTIMAS:</h4>
+                    
+                    <div style="margin: 10px 0; padding: 12px; background: rgba(66, 165, 245, 0.15); border-left: 3px solid #42A5F5; border-radius: 4px;">
+                        <strong style="color: #42A5F5;">📍 Algoritmo de Dijkstra:</strong>
+                        <p style="margin: 8px 0 8px 0; line-height: 1.6;">
+                            Encuentra el camino más corto desde un nodo origen hasta todos los demás nodos del grafo.
+                        </p>
+                        <ul style="margin: 4px 0;">
+                            <li><strong>Uso:</strong> Redes de transporte, GPS, routing de redes</li>
+                            <li><strong>Característica:</strong> Solo funciona con pesos no negativos</li>
+                            <li><strong>Complejidad:</strong> O(V²) o O(E log V) con heap</li>
+                            <li><strong>Ventaja:</strong> Encuentra la ruta óptima garantizada</li>
+                        </ul>
+                    </div>
+
+                    <div style="margin: 10px 0; padding: 12px; background: rgba(76, 175, 80, 0.15); border-left: 3px solid #4CAF50; border-radius: 4px;">
+                        <strong style="color: #4CAF50;">⭐ Algoritmo A* (A-Star):</strong>
+                        <p style="margin: 8px 0 8px 0; line-height: 1.6;">
+                            Versión mejorada de Dijkstra que usa una heurística para dirigir la búsqueda hacia el destino.
+                        </p>
+                        <ul style="margin: 4px 0;">
+                            <li><strong>Uso:</strong> Videojuegos, navegación, robótica</li>
+                            <li><strong>Característica:</strong> Más rápido que Dijkstra con heurística admisible</li>
+                            <li><strong>Heurística:</strong> f(n) = g(n) + h(n)</li>
+                            <li><strong>Ventaja:</strong> Explora menos nodos, más eficiente</li>
+                        </ul>
+                    </div>
+
+                    <div style="margin: 10px 0; padding: 12px; background: rgba(255, 213, 79, 0.15); border-left: 3px solid #FFD54F; border-radius: 4px;">
+                        <strong style="color: #FFD54F;">⏱️ PERT/CPM (Critical Path Method):</strong>
+                        <p style="margin: 8px 0 8px 0; line-height: 1.6;">
+                            Técnica de gestión de proyectos para planificar y controlar tareas con dependencias.
+                        </p>
+                        <ul style="margin: 4px 0;">
+                            <li><strong>Uso:</strong> Gestión de proyectos, construcción, desarrollo software</li>
+                            <li><strong>PERT:</strong> Program Evaluation and Review Technique</li>
+                            <li><strong>CPM:</strong> Identifica la ruta crítica (más larga)</li>
+                            <li><strong>Conceptos clave:</strong>
+                                <ul style="margin-top: 4px;">
+                                    <li>ES (Early Start): Inicio más temprano posible</li>
+                                    <li>EF (Early Finish): Fin más temprano posible</li>
+                                    <li>LS (Late Start): Inicio más tardío permitido</li>
+                                    <li>LF (Late Finish): Fin más tardío permitido</li>
+                                    <li>Slack/Holgura: Tiempo que se puede retrasar sin afectar el proyecto</li>
+                                </ul>
+                            </li>
+                            <li><strong>Nodo Task:</strong> Representa una actividad con duración configurable</li>
+                            <li><strong>⚠️ Validación automática:</strong> Si aparecen valores ES, EF, LS o LF negativos, significa que el planteamiento tiene errores (ciclos, dependencias mal definidas, duraciones incorrectas)</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="help-tip">🎯 <strong>Ejecutar algoritmos:</strong> Botón "🔍 Analizar" → Visualiza rutas óptimas resaltadas en el canvas</div>
+                    <div class="help-tip">⚠️ <strong>Valores negativos:</strong> Indica error en el planteamiento. Revisa conexiones, duraciones y que no haya ciclos</div>
+                </div>
+
+                <div class="help-section">
+                    <h4>�🔧 CREAR NODOS PERSONALIZADOS:</h4>
                     <p>Edita el archivo <code>src/core/NodeTypes.ts</code>:</p>
                     <pre class="code-example">
 "mi_nodo": {
@@ -307,6 +384,8 @@
                         <li><strong>Templates:</strong> Workflows completos con múltiples nodos</li>
                         <li><strong>Auto-guardado:</strong> Los templates se guardan en navegador</li>
                         <li><strong>Cargar:</strong> Dropdown + botón "Cargar Template"</li>
+                        <li><strong>Guardar cambios:</strong> Botón "Guardar" actualiza el template actual</li>
+                        <li><strong>Guardar como nuevo:</strong> Botón "Guardar como" crea una copia</li>
                     </ul>
                 </div>
 

@@ -150,9 +150,16 @@ export function initCanvasUI() {
   if (!canvas) throw new Error('Canvas element not found');
   const ctx = canvas.getContext('2d')!;
   
-  // Canvas ocupa TODA la ventana disponible para máxima área de trabajo
+  // Función para calcular la altura del toolbar dinámicamente
+  function getToolbarHeight(): number {
+    const toolbar = document.getElementById('toolbar');
+    if (!toolbar) return 80; // Valor por defecto si no existe
+    return toolbar.offsetHeight;
+  }
+  
+  // Canvas ocupa TODA la ventana disponible menos el toolbar
   canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight - 80; // Solo margen para toolbar
+  canvas.height = window.innerHeight - getToolbarHeight();
   
   const coordsDisplay = document.getElementById('coordinates') || document.createElement('span');
   const zoomDisplay = document.getElementById('zoom') || document.createElement('span');
@@ -232,7 +239,7 @@ export function initCanvasUI() {
   window.addEventListener('resize', () => {
     // Canvas se ajusta COMPLETAMENTE a la ventana
     canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight - 80; // Solo espacio para toolbar
+    canvas.height = window.innerHeight - getToolbarHeight();
     inpt.aspectRatio = canvas.width / canvas.height;
     console.log(`📐 Canvas redimensionado: ${canvas.width}x${canvas.height}`);
   });
@@ -271,8 +278,13 @@ export function initCanvasUI() {
     const mouseWorld = screenToWorldLocal(mouseScreen);
     
     // Buscar si el clic fue sobre una conexión
-    let clickedConnection: [number, any] | null = null;
-    const clickThreshold = 0.3; // Distancia máxima para considerar un clic en la línea
+    let clickedConnectionIndex = -1;
+    let clickedConnectionLink: [Pin, Pin] | null = null;
+    // Umbral más grande para facilitar el clic (ajustado por el zoom)
+    const clickThreshold = 0.5 / editor.scale;
+    
+    let minDist = Infinity;
+    let bestLink: any = null;
     
     editor.links.forEach((link, index) => {
       if (!link || !link[0] || !link[1]) return;
@@ -280,17 +292,30 @@ export function initCanvasUI() {
       const p1 = link[0].pos;
       const p2 = link[1].pos;
       
-      // Calcular distancia del punto a la línea (simplificado)
+      // Calcular distancia del punto a la línea
       const dist = pointToLineDistance(mouseWorld, p1, p2);
       
-      if (dist < clickThreshold) {
-        clickedConnection = [index, link];
+      // Encontrar la conexión más cercana dentro del umbral
+      if (dist < clickThreshold && dist < minDist) {
+        minDist = dist;
+        clickedConnectionIndex = index;
+        bestLink = link;
+        clickedConnectionLink = link as [Pin, Pin];
       }
     });
     
-    if (clickedConnection) {
-      const [index, connection] = clickedConnection;
-      connectionPropertiesPanel.show(connection, index);
+    if (clickedConnectionLink && clickedConnectionIndex >= 0 && bestLink) {
+      const fromNode = bestLink[0].parent;
+      const toNode = bestLink[1].parent;
+      console.log('🔗 Abriendo panel de conexión:', {
+        index: clickedConnectionIndex,
+        distance: minDist.toFixed(3),
+        from: fromNode.customTitle || fromNode.title,
+        to: toNode.customTitle || toNode.title
+      });
+      connectionPropertiesPanel.show(clickedConnectionLink, clickedConnectionIndex);
+    } else {
+      console.log('❌ No se detectó ninguna conexión cerca del click. Distancia mínima:', minDist === Infinity ? 'N/A' : minDist.toFixed(3));
     }
   });
   

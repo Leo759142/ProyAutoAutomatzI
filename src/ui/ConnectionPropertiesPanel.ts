@@ -88,13 +88,30 @@ export class ConnectionPropertiesPanel {
     const fromIndex = this.editor.nodes.indexOf(fromNode);
     const toIndex = this.editor.nodes.indexOf(toNode);
 
-    // Mostrar información de la conexión
+    // Mostrar información de la conexión con mejor formato
     const connectionInfo = document.getElementById('connectionInfo');
     if (connectionInfo) {
       connectionInfo.innerHTML = `
-        <div style="margin-bottom: 12px;">
-          <strong>Desde:</strong> ${fromNode.customTitle || fromNode.title} [Pin ${fromPin.index}]<br>
-          <strong>Hasta:</strong> ${toNode.customTitle || toNode.title} [Pin ${toPin.index}]
+        <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <span style="color: #4CAF50; font-size: 18px;">●</span>
+            <div style="flex: 1;">
+              <strong style="color: #4CAF50;">Origen:</strong><br>
+              <span style="margin-left: 4px;">${fromNode.customTitle || fromNode.title}</span>
+              <span style="opacity: 0.6; font-size: 0.9em;"> [Pin: ${fromPin.name || fromPin.index}]</span>
+            </div>
+          </div>
+          <div style="text-align: center; margin: 8px 0; opacity: 0.5;">
+            ⬇️
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="color: #42A5F5; font-size: 18px;">●</span>
+            <div style="flex: 1;">
+              <strong style="color: #42A5F5;">Destino:</strong><br>
+              <span style="margin-left: 4px;">${toNode.customTitle || toNode.title}</span>
+              <span style="opacity: 0.6; font-size: 0.9em;"> [Pin: ${toPin.name || toPin.index}]</span>
+            </div>
+          </div>
         </div>
       `;
     }
@@ -139,22 +156,34 @@ export class ConnectionPropertiesPanel {
 
       // Actualizar el peso
       if (weightValue === '') {
-        // Sin peso
-        delete this.editor.templateConnections[this.currentConnectionIndex].weight;
+        // Sin peso - eliminar el peso si existía
+        if (this.editor.templateConnections[this.currentConnectionIndex].weight !== undefined) {
+          delete this.editor.templateConnections[this.currentConnectionIndex].weight;
+          console.log('ℹ️ Peso de conexión eliminado (sin peso)');
+        }
       } else {
         const weight = parseFloat(weightValue);
-        if (!isNaN(weight) && weight > 0) {
-          this.editor.templateConnections[this.currentConnectionIndex].weight = weight;
+        if (!isNaN(weight)) {
+          if (weight >= 0) {
+            this.editor.templateConnections[this.currentConnectionIndex].weight = weight;
+            console.log('✅ Peso de conexión actualizado:', {
+              connectionIndex: this.currentConnectionIndex,
+              weight: weight,
+              from: this.currentConnection[0].parent.title,
+              to: this.currentConnection[1].parent.title
+            });
+          } else {
+            alert('⚠️ El peso debe ser un número positivo o cero');
+            return;
+          }
         } else {
-          alert('⚠️ El peso debe ser un número positivo');
+          alert('⚠️ El peso debe ser un número válido');
           return;
         }
       }
 
-      console.log('✅ Peso de conexión actualizado:', {
-        connectionIndex: this.currentConnectionIndex,
-        weight: this.editor.templateConnections[this.currentConnectionIndex].weight
-      });
+      // Recalcular después de cambiar el peso (útil para algoritmos que dependen del peso)
+      this.editor.computeAll();
     }
 
     this.hide();
@@ -167,8 +196,12 @@ export class ConnectionPropertiesPanel {
     if (!this.currentConnection || !this.editor || this.currentConnectionIndex < 0) return;
 
     const [fromPin, toPin] = this.currentConnection;
+    const fromNode = fromPin.parent;
+    const toNode = toPin.parent;
     
-    if (confirm('¿Eliminar esta conexión?')) {
+    const confirmMsg = `¿Eliminar esta conexión?\n\nDesde: ${fromNode.customTitle || fromNode.title}\nHasta: ${toNode.customTitle || toNode.title}`;
+    
+    if (confirm(confirmMsg)) {
       // Limpiar userData de los pins
       fromPin.userData = null;
       toPin.userData = null;
@@ -181,10 +214,15 @@ export class ConnectionPropertiesPanel {
         delete this.editor.templateConnections[this.currentConnectionIndex];
       }
       
-      // Recalcular
+      // Recalcular para propagar cambios
       this.editor.computeAll();
       
-      console.log('🗑️ Conexión eliminada:', this.currentConnectionIndex);
+      console.log('🗑️ Conexión eliminada:', {
+        index: this.currentConnectionIndex,
+        from: fromNode.title,
+        to: toNode.title
+      });
+      
       this.hide();
     }
   }
