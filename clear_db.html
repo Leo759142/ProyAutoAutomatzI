@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Database</title>
+</head>
+<body>
+    <h1>Borrar Base de Datos</h1>
+    <button onclick="clearDB()">🗑️ BORRAR TODO Y RECARGAR</button>
+    <div id="status"></div>
+
+    <script>
+        async function clearDB() {
+            const status = document.getElementById('status');
+            status.innerHTML = '⏳ Borrando base de datos...';
+            
+            try {
+                // Borrar IndexedDB (si existe)
+                const dbs = await window.indexedDB.databases();
+                for (const db of dbs) {
+                    if (db.name) {
+                        console.log('Borrando DB:', db.name);
+                        window.indexedDB.deleteDatabase(db.name);
+                    }
+                }
+                
+                // Limpiar localStorage
+                localStorage.clear();
+                
+                // Limpiar sessionStorage
+                sessionStorage.clear();
+                
+                status.innerHTML = '✅ Base de datos borrada. Recargando página en 2 segundos...';
+                
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+                
+            } catch (error) {
+                status.innerHTML = '❌ Error: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>

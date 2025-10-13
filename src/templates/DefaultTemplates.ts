@@ -47,12 +47,12 @@ export const defaultTemplates: WorkflowTemplate[] = [
   { id: 3, type: 'display', position: { x: 10, y: -4 }, data: { customDescription: 'Salida TRUE' } },
   { id: 4, type: 'display', position: { x: 10, y: 4 }, data: { customDescription: 'Salida FALSE' } }
     ]),
-    connections_data: JSON.stringify([
-      { from: { node: 1, pin: 0 }, to: { node: 2, pin: 0 } },
-      { from: { node: 2, pin: 0 }, to: { node: 3, pin: 0 } },
-      { from: { node: 2, pin: 0 }, to: { node: 4, pin: 0 } }
-    ])
-  },
+      connections_data: JSON.stringify([
+        { from: { node: 1, pin: 0 }, to: { node: 2, pin: 0 } },
+        { from: { node: 2, pin: 0 }, to: { node: 3, pin: 0 } },
+        { from: { node: 2, pin: 1 }, to: { node: 4, pin: 0 } }
+      ])
+    },
   {
     name: 'Operaciones Matemáticas',
     description: 'Demuestra nodos de suma, multiplicación y comparación',
@@ -238,25 +238,19 @@ export const defaultTemplates: WorkflowTemplate[] = [
       
       // ACTIVIDADES DEL PROYECTO (nodos tipo TASK)
       { id: 1, type: 'task', position: { x: -10, y: 0 }, 
-        data: { value: 5, customTitle: 'A: Diseño', customDescription: 'Diseño arquitectónico del sistema (5 días)' } },
-      
+        data: { customTitle: 'A: Diseño', customDescription: 'Diseño arquitectónico del sistema (5 días)' } },
       { id: 2, type: 'task', position: { x: -5, y: -3 }, 
-        data: { value: 3, customTitle: 'B: Backend', customDescription: 'Desarrollo Backend API REST (3 días)' } },
-      
+        data: { customTitle: 'B: Backend', customDescription: 'Desarrollo Backend API REST (3 días)' } },
       { id: 3, type: 'task', position: { x: -5, y: 3 }, 
-        data: { value: 2, customTitle: 'C: Frontend', customDescription: 'Desarrollo Frontend UI (2 días)' } },
-      
+        data: { customTitle: 'C: Frontend', customDescription: 'Desarrollo Frontend UI (2 días)' } },
       { id: 4, type: 'task', position: { x: 0, y: -3 }, 
-        data: { value: 8, customTitle: 'D: Base Datos', customDescription: 'Diseño e implementación BD (8 días)' } },
-      
+        data: { customTitle: 'D: Base Datos', customDescription: 'Diseño e implementación BD (8 días)' } },
       { id: 5, type: 'task', position: { x: 0, y: 3 }, 
-        data: { value: 6, customTitle: 'E: Componentes', customDescription: 'Componentes React (6 días)' } },
-      
+        data: { customTitle: 'E: Componentes', customDescription: 'Componentes React (6 días)' } },
       { id: 6, type: 'task', position: { x: 5, y: 0 }, 
-        data: { value: 4, customTitle: 'F: Testing', customDescription: 'Testing integral e2e (4 días)' } },
-      
+        data: { customTitle: 'F: Testing', customDescription: 'Testing integral e2e (4 días)' } },
       { id: 7, type: 'task', position: { x: 10, y: 0 }, 
-        data: { value: 2, customTitle: 'G: Deploy', customDescription: 'Deployment a AWS (2 días)' } },
+        data: { customTitle: 'G: Deploy', customDescription: 'Deployment a AWS (2 días)' } },
       
       // DISPLAYS para visualización
       { id: 8, type: 'display', position: { x: 12, y: 0 }, 
@@ -292,28 +286,21 @@ export const defaultTemplates: WorkflowTemplate[] = [
       
       // ACTIVIDADES (nodos tipo TASK con duraciones)
       { id: 1, type: 'task', position: { x: -10, y: -4 }, 
-        data: { value: 7, customTitle: 'A: Planos', customDescription: 'Planos y permisos legales (7 días)' } },
-      
+        data: { customTitle: 'A: Planos', customDescription: 'Planos y permisos legales (7 días)' } },
       { id: 2, type: 'task', position: { x: -10, y: 0 }, 
-        data: { value: 10, customTitle: 'B: Cimientos', customDescription: 'Excavación y cimientos (10 días)' } },
-      
+        data: { customTitle: 'B: Cimientos', customDescription: 'Excavación y cimientos (10 días)' } },
       { id: 3, type: 'task', position: { x: -5, y: 0 }, 
-        data: { value: 12, customTitle: 'C: Estructura', customDescription: 'Columnas y vigas concreto (12 días)' } },
-      
+        data: { customTitle: 'C: Estructura', customDescription: 'Columnas y vigas concreto (12 días)' } },
       { id: 4, type: 'task', position: { x: 0, y: 0 }, 
-        data: { value: 8, customTitle: 'D: Muros', customDescription: 'Mampostería y bloques (8 días)' } },
-      
+        data: { customTitle: 'D: Muros', customDescription: 'Mampostería y bloques (8 días)' } },
       { id: 5, type: 'task', position: { x: 5, y: 0 }, 
-        data: { value: 6, customTitle: 'E: Techo', customDescription: 'Losa y techumbre (6 días)' } },
-      
+        data: { customTitle: 'E: Techo', customDescription: 'Losa y techumbre (6 días)' } },
       { id: 6, type: 'task', position: { x: 10, y: -2 }, 
-        data: { value: 5, customTitle: 'F: Eléctrica', customDescription: 'Instalación eléctrica (5 días)' } },
-      
+        data: { customTitle: 'F: Eléctrica', customDescription: 'Instalación eléctrica (5 días)' } },
       { id: 7, type: 'task', position: { x: 10, y: 2 }, 
-        data: { value: 4, customTitle: 'G: Plomería', customDescription: 'Instalación sanitaria (4 días)' } },
-      
+        data: { customTitle: 'G: Plomería', customDescription: 'Instalación sanitaria (4 días)' } },
       { id: 8, type: 'task', position: { x: 15, y: 0 }, 
-        data: { value: 10, customTitle: 'H: Acabados', customDescription: 'Pisos, pintura, detalles (10 días)' } },
+        data: { customTitle: 'H: Acabados', customDescription: 'Pisos, pintura, detalles (10 días)' } },
       
       // DISPLAY para resultado
       { id: 9, type: 'display', position: { x: 18, y: 0 }, 
@@ -321,7 +308,7 @@ export const defaultTemplates: WorkflowTemplate[] = [
     ]),
     connections_data: JSON.stringify([
       // Dependencias del proyecto
-      // A y B pueden iniciar en paralelo (sin predecesores)
+      { from: { node: 1, pin: 0 }, to: { node: 2, pin: 0 } }, // A(Planos) → B(Cimientos)
       
       // Secuencia estructural principal
       { from: { node: 2, pin: 0 }, to: { node: 3, pin: 0 } }, // B(Cimientos) → C(Estructura)
@@ -343,75 +330,53 @@ export const defaultTemplates: WorkflowTemplate[] = [
   {
     name: '🔷 Dijkstra: Red Logística Nacional',
     description: 'Red de distribución compleja con 10 ciudades y múltiples rutas',
-    problemDescription: '🚚 PROBLEMA: Optimización de Rutas de Transporte Nacional\n\n📋 CONTEXTO: Empresa de logística "TransNacional" necesita enviar mercancía desde su Centro de Operaciones (Ciudad A) hasta el Puerto de Exportación (Ciudad J), atravesando una red de 10 ciudades interconectadas.\n\n�️ RED DE CIUDADES:\nA (Centro) → B (5km), C (4km)\nB → D (3km), E (7km)\nC → D (6km), F (2km)\nD → G (4km)\nE → G (2km), H (5km)\nF → H (3km)\nG → I (6km)\nH → I (4km), J (8km)\nI → J (3km)\n\n💰 COSTOS (km = costo):\n• Ruta Corta Riesgosa: A→C→F→H→J = 17km\n• Ruta Segura Larga: A→B→E→H→J = 25km\n• Ruta Balanceada: A→C→F→H→I→J = 16km ✅\n\n🎯 OBJETIVO: Dijkstra encontrará la ruta óptima considerando todos los caminos posibles.',
+    problemDescription: '🚚 PROBLEMA: Optimización de Rutas de Transporte Nacional\n\n📋 CONTEXTO: Empresa de logística "TransNacional" necesita enviar mercancía desde su Centro de Operaciones (Ciudad A) hasta el Puerto de Exportación (Ciudad J), atravesando una red de 10 ciudades interconectadas.\n\n🗺️ RED DE CIUDADES (distancias en km):\nA (Centro) → B(5km), C(4km)\nB → D(3km), E(7km)\nC → D(6km), F(2km)\nD → G(4km)\nE → G(2km), H(5km)\nF → H(3km)\nG → I(6km)\nH → I(4km), J(8km)\nI → J(3km)\n\n💰 ANÁLISIS DE RUTAS:\n• Ruta Corta Riesgosa: A→C→F→H→J = 4+2+3+8 = 17km\n• Ruta Segura Larga: A→B→E→H→J = 5+7+5+8 = 25km\n• Ruta Balanceada: A→C→F→H→I→J = 4+2+3+4+3 = 16km ✅\n\n🎯 OBJETIVO: Dijkstra encontrará la ruta óptima considerando todos los caminos posibles.',
     nodes_data: JSON.stringify([
       // INFO-PANEL
       { id: 0, type: 'info-panel', position: { x: -20, y: -12 }, 
-        data: { customDescription: '🚚 RED LOGÍSTICA NACIONAL - 10 CIUDADES\n\nProblema: Encontrar ruta más corta desde Ciudad A (Centro Operaciones) hasta Ciudad J (Puerto Exportación).\n\nDijkstra explora TODAS las rutas posibles y garantiza encontrar la óptima.\n\nNOTA: Los valores representan DISTANCIA en km (actividad de transporte entre ciudades).' } },
-      
-      // ACTIVIDADES DE TRANSPORTE (nodos tipo TASK)
-      { id: 1, type: 'task', position: { x: -15, y: 0 }, 
-        data: { value: 0, customTitle: 'A: Centro', customDescription: 'Ciudad A - Centro de Operaciones (INICIO)' } },
-      
-      { id: 2, type: 'task', position: { x: -10, y: -4 }, 
-        data: { value: 5, customTitle: 'B: Norte', customDescription: 'Ciudad B - Transporte 5km desde A' } },
-      
-      { id: 3, type: 'task', position: { x: -10, y: 4 }, 
-        data: { value: 4, customTitle: 'C: Sur', customDescription: 'Ciudad C - Transporte 4km desde A' } },
-      
-      { id: 4, type: 'task', position: { x: -5, y: -2 }, 
-        data: { value: 3, customTitle: 'D: Centro-N', customDescription: 'Ciudad D - Hub norte (3km desde B)' } },
-      
-      { id: 5, type: 'task', position: { x: -5, y: -6 }, 
-        data: { value: 7, customTitle: 'E: Extremo N', customDescription: 'Ciudad E - Transporte 7km desde B' } },
-      
-      { id: 6, type: 'task', position: { x: -5, y: 6 }, 
-        data: { value: 2, customTitle: 'F: Extremo S', customDescription: 'Ciudad F - Transporte 2km desde C' } },
-      
-      { id: 7, type: 'task', position: { x: 0, y: -2 }, 
-        data: { value: 4, customTitle: 'G: Centro-E', customDescription: 'Ciudad G - Hub este (4km desde D)' } },
-      
-      { id: 8, type: 'task', position: { x: 0, y: 4 }, 
-        data: { value: 3, customTitle: 'H: Este', customDescription: 'Ciudad H - Transporte 3km desde F' } },
-      
-      { id: 9, type: 'task', position: { x: 5, y: 0 }, 
-        data: { value: 4, customTitle: 'I: Pre-Puerto', customDescription: 'Ciudad I - Transporte 4km desde H' } },
-      
-      { id: 10, type: 'task', position: { x: 10, y: 0 }, 
-        data: { value: 3, customTitle: 'J: PUERTO', customDescription: 'Ciudad J - Puerto Exportación (3km desde I)' } },
-      
-      { id: 11, type: 'display', position: { x: 14, y: 0 }, 
-        data: { customDescription: '✅ Carga Entregada' } }
+        data: { customDescription: '🚚 RED LOGÍSTICA NACIONAL - 10 CIUDADES\n\nProblema: Encontrar ruta más corta desde Ciudad A (Centro Operaciones) hasta Ciudad J (Puerto Exportación).\n\nDijkstra calcula automáticamente los costos acumulados desde el origen usando los pesos de las conexiones.\n\nCada conexión tiene un peso (distancia en km) que Dijkstra usa para encontrar la ruta óptima.' } },
+      // NODOS DE CIUDAD (value representa tiempo/costo del nodo)
+      { id: 1, type: 'task', position: { x: -15, y: 0 }, data: { value: 0, customTitle: 'A: Centro', customDescription: 'Ciudad A - Centro de Operaciones (INICIO)' } },
+      { id: 2, type: 'task', position: { x: -10, y: -4 }, data: { value: 5, customTitle: 'B: Norte', customDescription: 'Ciudad B - 5km desde A' } },
+      { id: 3, type: 'task', position: { x: -10, y: 4 }, data: { value: 4, customTitle: 'C: Sur', customDescription: 'Ciudad C - 4km desde A' } },
+      { id: 4, type: 'task', position: { x: -5, y: -2 }, data: { value: 3, customTitle: 'D: Centro-N', customDescription: 'Ciudad D - 3km desde B, 6km desde C' } },
+      { id: 5, type: 'task', position: { x: -5, y: -6 }, data: { value: 7, customTitle: 'E: Extremo N', customDescription: 'Ciudad E - 7km desde B' } },
+      { id: 6, type: 'task', position: { x: -5, y: 6 }, data: { value: 2, customTitle: 'F: Extremo S', customDescription: 'Ciudad F - 2km desde C' } },
+      { id: 7, type: 'task', position: { x: 0, y: -2 }, data: { value: 4, customTitle: 'G: Centro-E', customDescription: 'Ciudad G - 4km desde D, 2km desde E' } },
+      { id: 8, type: 'task', position: { x: 0, y: 4 }, data: { value: 3, customTitle: 'H: Este', customDescription: 'Ciudad H - 5km desde E, 3km desde F' } },
+      { id: 9, type: 'task', position: { x: 5, y: 0 }, data: { value: 4, customTitle: 'I: Pre-Puerto', customDescription: 'Ciudad I - 6km desde G, 4km desde H' } },
+      { id: 10, type: 'task', position: { x: 10, y: 0 }, data: { value: 3, customTitle: 'J: PUERTO', customDescription: 'Ciudad J - Puerto (8km desde H, 3km desde I)' } },
+      { id: 11, type: 'display', position: { x: 14, y: 0 }, data: { customDescription: '✅ Carga Entregada' } }
     ]),
     connections_data: JSON.stringify([
       // Red compleja con múltiples caminos
       // Desde A (Centro)
-      { from: { node: 1, pin: 0 }, to: { node: 2, pin: 0 } }, // A → B (5km)
-      { from: { node: 1, pin: 0 }, to: { node: 3, pin: 0 } }, // A → C (4km)
+      { from: { node: 1, pin: 0 }, to: { node: 2, pin: 0 }, weight: 5 }, // A → B (5km)
+      { from: { node: 1, pin: 0 }, to: { node: 3, pin: 0 }, weight: 4 }, // A → C (4km)
       
       // Desde B (Norte)
-      { from: { node: 2, pin: 0 }, to: { node: 4, pin: 0 } }, // B → D (3km)
-      { from: { node: 2, pin: 0 }, to: { node: 5, pin: 0 } }, // B → E (7km)
+      { from: { node: 2, pin: 0 }, to: { node: 4, pin: 0 }, weight: 3 }, // B → D (3km)
+      { from: { node: 2, pin: 0 }, to: { node: 5, pin: 0 }, weight: 7 }, // B → E (7km)
       
       // Desde C (Sur)
-      { from: { node: 3, pin: 0 }, to: { node: 4, pin: 0 } }, // C → D (6km)
-      { from: { node: 3, pin: 0 }, to: { node: 6, pin: 0 } }, // C → F (2km)
+      { from: { node: 3, pin: 0 }, to: { node: 4, pin: 0 }, weight: 6 }, // C → D (6km)
+      { from: { node: 3, pin: 0 }, to: { node: 6, pin: 0 }, weight: 2 }, // C → F (2km)
       
       // Hacia G (Centro-Este)
-      { from: { node: 4, pin: 0 }, to: { node: 7, pin: 0 } }, // D → G (4km)
-      { from: { node: 5, pin: 0 }, to: { node: 7, pin: 0 } }, // E → G (2km)
+      { from: { node: 4, pin: 0 }, to: { node: 7, pin: 0 }, weight: 4 }, // D → G (4km)
+      { from: { node: 5, pin: 0 }, to: { node: 7, pin: 0 }, weight: 2 }, // E → G (2km)
       
       // Hacia H (Este)
-      { from: { node: 5, pin: 0 }, to: { node: 8, pin: 0 } }, // E → H (5km)
-      { from: { node: 6, pin: 0 }, to: { node: 8, pin: 0 } }, // F → H (3km)
+      { from: { node: 5, pin: 0 }, to: { node: 8, pin: 0 }, weight: 5 }, // E → H (5km)
+      { from: { node: 6, pin: 0 }, to: { node: 8, pin: 0 }, weight: 3 }, // F → H (3km)
       
       // Hacia I (Pre-Puerto)
-      { from: { node: 7, pin: 0 }, to: { node: 9, pin: 0 } }, // G → I (6km)
-      { from: { node: 8, pin: 0 }, to: { node: 9, pin: 0 } }, // H → I (4km)
+      { from: { node: 7, pin: 0 }, to: { node: 9, pin: 0 }, weight: 6 }, // G → I (6km)
+      { from: { node: 8, pin: 0 }, to: { node: 9, pin: 0 }, weight: 4 }, // H → I (4km)
       
       // Hacia J (PUERTO)
-      { from: { node: 8, pin: 0 }, to: { node: 10, pin: 0 } }, // H → J (8km) Ruta directa
-      { from: { node: 9, pin: 0 }, to: { node: 10, pin: 0 } }, // I → J (3km)
+      { from: { node: 8, pin: 0 }, to: { node: 10, pin: 0 }, weight: 8 }, // H → J (8km)
+      { from: { node: 9, pin: 0 }, to: { node: 10, pin: 0 }, weight: 3 }, // I → J (3km)
       
       // Display final
       { from: { node: 10, pin: 0 }, to: { node: 11, pin: 0 } }
@@ -472,33 +437,36 @@ export const defaultTemplates: WorkflowTemplate[] = [
     connections_data: JSON.stringify([
       // Red multi-planta compleja
       // Desde Recepción
-      { from: { node: 1, pin: 0 }, to: { node: 2, pin: 0 } }, // Recep → Norte Prep (2h)
-      { from: { node: 1, pin: 0 }, to: { node: 4, pin: 0 } }, // Recep → Sur Prep (5h)
+      { from: { node: 1, pin: 0 }, to: { node: 2, pin: 0 }, weight: 2 }, // Recep → Norte Prep (2h)
+      { from: { node: 1, pin: 0 }, to: { node: 4, pin: 0 }, weight: 5 }, // Recep → Sur Prep (5h)
       
       // Planta Norte
-      { from: { node: 2, pin: 0 }, to: { node: 3, pin: 0 } }, // Norte Prep → Corte (3h)
-      { from: { node: 2, pin: 0 }, to: { node: 7, pin: 0 } }, // Norte Prep → Transfer Este (6h)
+      { from: { node: 2, pin: 0 }, to: { node: 3, pin: 0 }, weight: 3 }, // Norte Prep → Corte (3h)
+      { from: { node: 2, pin: 0 }, to: { node: 7, pin: 0 }, weight: 6 }, // Norte Prep → Transfer Este (6h)
       
       // Planta Sur
-      { from: { node: 4, pin: 0 }, to: { node: 5, pin: 0 } }, // Sur Prep → Soldadura (4h)
-      { from: { node: 5, pin: 0 }, to: { node: 6, pin: 0 } }, // Sur Soldadura → Ensamble (2h)
+      { from: { node: 4, pin: 0 }, to: { node: 5, pin: 0 }, weight: 4 }, // Sur Prep → Soldadura (4h)
+      { from: { node: 5, pin: 0 }, to: { node: 6, pin: 0 }, weight: 2 }, // Sur Soldadura → Ensamble (2h)
       
       // Hacia Planta Este
-      { from: { node: 3, pin: 0 }, to: { node: 8, pin: 0 } }, // Norte Corte → Este Ensamble (5h)
-      { from: { node: 7, pin: 0 }, to: { node: 8, pin: 0 } }, // Transfer → Este Ensamble (3h)
-      { from: { node: 6, pin: 0 }, to: { node: 8, pin: 0 } }, // Sur Ensamble → Este Ensamble (4h)
+      { from: { node: 3, pin: 0 }, to: { node: 8, pin: 0 }, weight: 5 }, // Norte Corte → Este Ensamble (5h)
+      { from: { node: 7, pin: 0 }, to: { node: 8, pin: 0 }, weight: 3 }, // Transfer → Este Ensamble (3h)
+      { from: { node: 6, pin: 0 }, to: { node: 8, pin: 0 }, weight: 4 }, // Sur Ensamble → Este Ensamble (4h)
       
       // Proceso en Este
-      { from: { node: 8, pin: 0 }, to: { node: 9, pin: 0 } }, // Este Ensamble → Control (2h)
+      { from: { node: 8, pin: 0 }, to: { node: 9, pin: 0 }, weight: 2 }, // Este Ensamble → Control (2h)
       
       // Hacia Planta Oeste
-      { from: { node: 6, pin: 0 }, to: { node: 10, pin: 0 } }, // Sur Ensamble → Oeste Empaque (7h) [directa]
-      { from: { node: 9, pin: 0 }, to: { node: 10, pin: 0 } }, // Este Control → Oeste Empaque (4h)
+      { from: { node: 6, pin: 0 }, to: { node: 10, pin: 0 }, weight: 7 }, // Sur Ensamble → Oeste Empaque (7h) [directa]
+      { from: { node: 9, pin: 0 }, to: { node: 10, pin: 0 }, weight: 4 }, // Este Control → Oeste Empaque (4h)
       
       // Final
-      { from: { node: 10, pin: 0 }, to: { node: 11, pin: 0 } }, // Empaque → Almacén (1h)
+      { from: { node: 10, pin: 0 }, to: { node: 11, pin: 0 }, weight: 1 }, // Empaque → Almacén (1h)
       { from: { node: 11, pin: 0 }, to: { node: 12, pin: 0 } }  // Display
     ])
   }
-];
+]
+
+
+
 
