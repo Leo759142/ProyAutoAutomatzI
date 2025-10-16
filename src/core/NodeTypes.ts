@@ -506,21 +506,50 @@ export const NodeTypes: { [key: string]: NodeDefinition } = {
         subtitle: "Activity",
         description: "Nodo de tarea/actividad para PERT/CPM. La duración se configura en el output 'duration'",
         inputs: [
-            {
-                name: "predecessor",
-                type: PinType.Number,
-                mode: PinMode.Input,
-                defaultValue: 0
-            }
+                {
+                    name: "predecessor",
+                    type: PinType.Number,
+                    mode: PinMode.Input,
+                    defaultValue: 0,
+                    allowMultiple: true  // Permite múltiples predecesores
+                }
         ],
         outputs: [{
             name: "duration",
             type: PinType.Number,
             mode: PinMode.Output,
-            defaultValue: 1
+            defaultValue: 1,
+            allowMultiple: true  // Permite conectarse a múltiples sucesores
         }],
         compute: (inputs: any[], node: any) => {
-            // La duración se mantiene del valor configurado
+            // Si hay estimaciones PERT (optimista, más probable, pesimista), calcular tiempo esperado
+            if (node.pertData?.optimistic !== undefined && 
+                node.pertData?.mostLikely !== undefined && 
+                node.pertData?.pessimistic !== undefined) {
+                
+                const O = node.pertData.optimistic;
+                const M = node.pertData.mostLikely;
+                const P = node.pertData.pessimistic;
+                
+                // Fórmula PERT: TE = (O + 4M + P) / 6
+                const expectedTime = (O + 4 * M + P) / 6;
+                
+                // Fórmula de varianza: σ² = ((P - O) / 6)²
+                const variance = Math.pow((P - O) / 6, 2);
+                
+                // Desviación estándar: σ = √(varianza)
+                const stdDev = Math.sqrt(variance);
+                
+                // Actualizar valores calculados
+                node.pertData.expectedTime = expectedTime;
+                node.pertData.variance = variance;
+                node.pertData.stdDev = stdDev;
+                
+                // Retornar tiempo esperado como duración
+                return [expectedTime];
+            }
+            
+            // Si no hay datos PERT, usar la duración simple
             return [node.outputs[0].value];
         }
     },

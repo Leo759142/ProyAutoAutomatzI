@@ -9,6 +9,7 @@
     "deploy": "npm run build && git add dist -f && git commit -m 'Deploy to GitHub Pages' && git push"
   },
   "dependencies": {
+    "marked": "^16.4.0",
     "sql.js": "^1.13.0",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7"

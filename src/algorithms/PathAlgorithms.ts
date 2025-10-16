@@ -1,5 +1,12 @@
 import { Node } from '../core/Node';
 import { NodeEditor } from '../core/NodeEditor';
+import { 
+    AlgorithmsValidation, 
+    AlgorithmApplicability, 
+    ProblemContext,
+    PROBLEM_CONTEXTS,
+    UNITS 
+} from '../types/ProblemContext';
 
 export interface PathResult {
     algorithm: string;
@@ -10,6 +17,7 @@ export interface PathResult {
     totalTime?: number;
     message: string;
     details?: any;
+    unit?: string; // Unidad de medida del resultado
 }
 
 export interface GraphNode {
@@ -189,6 +197,215 @@ function findSourceAndSink(editor: NodeEditor): { sources: number[]; sinks: numb
     });
     
     return { sources, sinks };
+}
+
+/**
+ * VALIDACIÓN: Determina qué algoritmos son aplicables al grafo actual
+ * 
+ * Reglas de aplicabilidad:
+ * - Dijkstra/A*: Requieren pesos en conexiones, no son ideales para nodos task
+ * - PERT/CPM: Requiere nodos task con duraciones y DAG (sin ciclos)
+ */
+export function getApplicableAlgorithms(editor: NodeEditor, context?: ProblemContext): AlgorithmsValidation {
+    const graph = buildWeightedGraphForPath(editor);
+    const graphPERT = buildWeightedGraphForPERT(editor);
+    
+    // Análisis del grafo
+    const nodeTypes = new Set<string>();
+    editor.nodes.forEach(node => {
+        if (node.type !== 'info-panel') {
+            nodeTypes.add(node.type);
+        }
+    });
+    
+    const hasTaskNodes = nodeTypes.has('task');
+    const hasWeights = editor.templateConnections?.some(c => c.weight !== undefined && c.weight > 0) || false;
+    const hasCycles = detectCycle(graphPERT);
+    const nodeCount = graph.size;
+    const hasConnections = editor.links.length > 0;
+    
+    // Determinar contexto si no se proporciona
+    let inferredContext = context;
+    if (!inferredContext) {
+        if (hasTaskNodes && !hasCycles) {
+            inferredContext = PROBLEM_CONTEXTS.projectScheduling;
+        } else if (hasWeights) {
+            inferredContext = PROBLEM_CONTEXTS.transportation;
+        } else {
+            inferredContext = PROBLEM_CONTEXTS.generic;
+        }
+    }
+    
+    // VALIDACIÓN DIJKSTRA
+    const dijkstraValidation: AlgorithmApplicability = (() => {
+        if (nodeCount === 0) {
+            return {
+                applicable: false,
+                reason: 'No hay nodos procesables en el grafo',
+                severity: 'error'
+            };
+        }
+        
+        if (!hasConnections) {
+            return {
+                applicable: false,
+                reason: 'No hay conexiones entre nodos',
+                severity: 'error'
+            };
+        }
+        
+        if (hasTaskNodes) {
+            return {
+                applicable: true,
+                reason: 'Funciona, pero PERT/CPM es más apropiado para grafos con nodos task',
+                severity: 'warning',
+                suggestions: [
+                    'Los nodos task representan actividades con duración',
+                    'Dijkstra usa pesos de CONEXIONES, no duraciones de nodos',
+                    'Considera usar PERT/CPM para análisis de ruta crítica'
+                ]
+            };
+        }
+        
+        if (!hasWeights) {
+            return {
+                applicable: true,
+                reason: 'Funciona con pesos por defecto (1), pero es más útil con pesos definidos',
+                severity: 'warning',
+                suggestions: [
+                    'Asigna pesos a las conexiones para resultados más significativos',
+                    'Haz clic en las conexiones para configurar sus pesos'
+                ]
+            };
+        }
+        
+        return {
+            applicable: true,
+            reason: 'Algoritmo aplicable - Encuentra el camino más corto basado en pesos de conexiones',
+            severity: 'ok'
+        };
+    })();
+    
+    // VALIDACIÓN A*
+    const astarValidation: AlgorithmApplicability = (() => {
+        // A* tiene los mismos requisitos que Dijkstra
+        if (!dijkstraValidation.applicable) {
+            return {
+                ...dijkstraValidation,
+                reason: dijkstraValidation.reason.replace('Dijkstra', 'A*')
+            };
+        }
+        
+        // Advertencia adicional sobre heurística espacial
+        if (dijkstraValidation.severity === 'ok') {
+            return {
+                applicable: true,
+                reason: 'Algoritmo aplicable - Usa heurística de distancia euclidiana para optimización',
+                severity: 'ok',
+                suggestions: [
+                    'La heurística se basa en la posición de los nodos en el canvas',
+                    'Funciona mejor cuando las posiciones reflejan la distancia real del problema'
+                ]
+            };
+        }
+        
+        return dijkstraValidation;
+    })();
+    
+    // VALIDACIÓN PERT/CPM
+    const pertValidation: AlgorithmApplicability = (() => {
+        if (nodeCount === 0) {
+            return {
+                applicable: false,
+                reason: 'No hay nodos procesables en el grafo',
+                severity: 'error'
+            };
+        }
+        
+        if (!hasConnections) {
+            return {
+                applicable: false,
+                reason: 'No hay conexiones entre nodos',
+                severity: 'error'
+            };
+        }
+        
+        if (hasCycles) {
+            return {
+                applicable: false,
+                reason: 'PERT/CPM requiere un grafo acíclico (DAG) - Se detectaron ciclos',
+                severity: 'error',
+                suggestions: [
+                    'Elimina las conexiones que crean ciclos',
+                    'Verifica que el flujo de actividades sea unidireccional'
+                ]
+            };
+        }
+        
+        if (!hasTaskNodes) {
+            return {
+                applicable: true,
+                reason: 'Funciona, pero es más útil con nodos task que representen actividades',
+                severity: 'warning',
+                suggestions: [
+                    'PERT/CPM está diseñado para planificación de proyectos',
+                    'Usa nodos task con duraciones para análisis de ruta crítica',
+                    'Considera usar Dijkstra si buscas el camino más corto'
+                ]
+            };
+        }
+        
+        // Verificar si los nodos task tienen duraciones
+        const tasksWithDuration = editor.nodes.filter(n => 
+            n.type === 'task' && n.outputs[0]?.value > 0
+        ).length;
+        
+        const totalTasks = editor.nodes.filter(n => n.type === 'task').length;
+        
+        if (tasksWithDuration === 0 && totalTasks > 0) {
+            return {
+                applicable: true,
+                reason: 'Los nodos task no tienen duraciones asignadas - Se usará duración por defecto',
+                severity: 'warning',
+                suggestions: [
+                    'Configura la duración de cada tarea en sus propiedades',
+                    'El campo "duration" representa el tiempo de ejecución de la tarea'
+                ]
+            };
+        }
+        
+        return {
+            applicable: true,
+            reason: 'Algoritmo aplicable - Análisis de ruta crítica para planificación de proyectos',
+            severity: 'ok',
+            suggestions: [
+                `Unidades: ${inferredContext?.unit.label || 'No especificadas'}`,
+                'Identifica tareas críticas y calcula holguras',
+                'Calcula varianza si configuras tiempos optimista/pesimista/más probable'
+            ]
+        };
+    })();
+    
+    // Determinar algoritmo recomendado
+    let recommendedAlgorithm: 'dijkstra' | 'astar' | 'pert' | undefined;
+    
+    if (hasTaskNodes && !hasCycles) {
+        recommendedAlgorithm = 'pert';
+    } else if (hasWeights) {
+        recommendedAlgorithm = 'dijkstra';
+    } else if (pertValidation.applicable && pertValidation.severity === 'ok') {
+        recommendedAlgorithm = 'pert';
+    } else if (dijkstraValidation.applicable) {
+        recommendedAlgorithm = 'dijkstra';
+    }
+    
+    return {
+        dijkstra: dijkstraValidation,
+        astar: astarValidation,
+        pert: pertValidation,
+        recommendedAlgorithm,
+        context: inferredContext
+    };
 }
 
 /**
@@ -753,33 +970,106 @@ export function pertCPM(editor: NodeEditor): PathResult {
         }
     });
     
+    // ========== CÁLCULO DE VARIANZA DEL PROYECTO (PERT) ==========
+    // Calcular varianza del proyecto sumando las varianzas de las tareas críticas
+    let projectVariance = 0;
+    let tasksWithVariance = 0;
+    let tasksWithoutVariance = 0;
+    
+    criticalPath.forEach(nodeId => {
+        const node = editor.nodes[nodeId];
+        if (node && node.pertData?.variance !== undefined) {
+            projectVariance += node.pertData.variance;
+            tasksWithVariance++;
+        } else {
+            tasksWithoutVariance++;
+        }
+    });
+    
+    const projectStdDev = Math.sqrt(projectVariance);
+    
+    // Intervalos de confianza basados en distribución normal
+    // 68% confianza: μ ± 1σ
+    // 95% confianza: μ ± 2σ  
+    // 99.7% confianza: μ ± 3σ
+    const confidence68 = {
+        min: totalTime - projectStdDev,
+        max: totalTime + projectStdDev
+    };
+    
+    const confidence95 = {
+        min: totalTime - 2 * projectStdDev,
+        max: totalTime + 2 * projectStdDev
+    };
+    
+    const confidence997 = {
+        min: totalTime - 3 * projectStdDev,
+        max: totalTime + 3 * projectStdDev
+    };
+    
     // Crear tabla de detalles
     const details: any[] = [];
     graph.forEach((node, id) => {
+        const editorNode = editor.nodes[id];
         details.push({
             node: id,
-            name: editor.nodes[id]?.customTitle || editor.nodes[id]?.type || `Node ${id}`,
+            name: editorNode?.customTitle || editorNode?.type || `Node ${id}`,
             ES: ES.get(id) || 0,
             EF: EF.get(id) || 0,
             LS: LS.get(id) || 0,
             LF: LF.get(id) || 0,
             slack: slack.get(id) || 0,
-            isCritical: criticalPathSet.has(id) // Solo los del camino crítico
+            isCritical: criticalPathSet.has(id),
+            // Incluir datos PERT si existen
+            pertData: editorNode?.pertData ? {
+                optimistic: editorNode.pertData.optimistic,
+                mostLikely: editorNode.pertData.mostLikely,
+                pessimistic: editorNode.pertData.pessimistic,
+                expectedTime: editorNode.pertData.expectedTime,
+                variance: editorNode.pertData.variance,
+                stdDev: editorNode.pertData.stdDev
+            } : undefined
         });
     });
+    
+    // Construir mensaje con análisis de varianza si hay datos PERT
+    let varianceMessage = '';
+    if (tasksWithVariance > 0) {
+        varianceMessage = `\n\n📊 ANÁLISIS DE VARIANZA PERT:\n` +
+                          `  • Varianza del proyecto: ${projectVariance.toFixed(4)}\n` +
+                          `  • Desviación estándar: ${projectStdDev.toFixed(2)} unidades\n` +
+                          `  • Tareas con estimaciones PERT: ${tasksWithVariance}/${criticalPath.length}\n\n` +
+                          `⏱️ INTERVALOS DE CONFIANZA:\n` +
+                          `  • 68% confianza: ${confidence68.min.toFixed(1)} - ${confidence68.max.toFixed(1)} unidades\n` +
+                          `  • 95% confianza: ${confidence95.min.toFixed(1)} - ${confidence95.max.toFixed(1)} unidades\n` +
+                          `  • 99.7% confianza: ${confidence997.min.toFixed(1)} - ${confidence997.max.toFixed(1)} unidades`;
+    } else if (tasksWithoutVariance > 0) {
+        varianceMessage = `\n\n💡 TIP: Configura estimaciones PERT (optimista/más probable/pesimista) en las tareas\n` +
+                          `   para obtener análisis de varianza y probabilidades de cumplimiento.`;
+    }
     
     return {
         algorithm: 'PERT/CPM',
         success: true,
         criticalPath,
         totalTime,
-        message: `✅ Ruta Crítica encontrada:\n${pathNames.join(' → ')}\n\nTiempo total del proyecto: ${totalTime}\nNodos críticos: ${criticalPath.length}`,
+        message: `✅ Ruta Crítica encontrada:\n${pathNames.join(' → ')}\n\n` +
+                 `⏱️ Tiempo total del proyecto: ${totalTime} unidades\n` +
+                 `🎯 Nodos críticos: ${criticalPath.length}${varianceMessage}`,
         details: {
             criticalNodes: criticalPath,
             nodeNames: pathNames,
             projectDuration: totalTime,
+            variance: projectVariance,
+            stdDev: projectStdDev,
+            confidence68,
+            confidence95,
+            confidence997,
+            tasksWithVariance,
+            tasksWithoutVariance,
             analysisTable: details
-        }
+        },
+        unit: 'unidades' // TODO: Obtener del contexto del problema
     };
 }
 

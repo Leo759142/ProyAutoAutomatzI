@@ -62,16 +62,38 @@ export class SessionManager {
       }
 
       // Preparar datos de nodos
-      const nodesData = this.nodeEditor.nodes.map((node, index) => ({
-        id: index + 1,
-        type: node.type,
-        position: { x: node.pos.x, y: node.pos.y },
-        data: {
-          ...(node.outputs.length > 0 && node.outputs[0].value !== undefined ? { value: node.outputs[0].value } : {}),
-          ...(node.customTitle !== null ? { customTitle: node.customTitle } : {}),
-          ...(node.customDescription !== null ? { customDescription: node.customDescription } : {})
+      const nodesData = this.nodeEditor.nodes.map((node, index) => {
+        const nodeData: any = {
+          id: index + 1,
+          type: node.type,
+          position: { x: node.pos.x, y: node.pos.y },
+          data: {}
+        };
+
+        // Guardar valor del output si existe (para nodos de entrada y Task)
+        if (node.outputs.length > 0 && node.outputs[0].value !== undefined) {
+          nodeData.data.value = node.outputs[0].value;
         }
-      }));
+
+        // Guardar valores de inputs si existen (para nodos con inputs editables)
+        if (node.inputs.length > 0) {
+          const inputValues: any[] = [];
+          node.inputs.forEach(input => {
+            if (input.value !== undefined) {
+              inputValues.push(input.value);
+            }
+          });
+          if (inputValues.length > 0) {
+            nodeData.data.inputValues = inputValues;
+          }
+        }
+
+        // Guardar título y descripción personalizados
+        if (node.customTitle !== null) nodeData.data.customTitle = node.customTitle;
+        if (node.customDescription !== null) nodeData.data.customDescription = node.customDescription;
+
+        return nodeData;
+      });
 
       // Preparar datos de conexiones
       const connectionsData = this.nodeEditor.links

@@ -31,17 +31,17 @@ export interface ExecutionConfig {
     config_data: string;
 }
 
-/**
- * 🔒 SECURE DatabaseService using SQL.js with Parameterized Queries
- * 
- * Security Features:
- * - ✅ Parameterized queries (NO string concatenation)
- * - ✅ Input validation (length, format)
- * - ✅ HTML escaping on output
+/* DatabaseService seguro usando SQL.js con consultas parametrizadas
+ *
+ * Características de seguridad:
+ * - ✅ Consultas parametrizadas (SIN concatenación de cadenas)
+ * - ✅ Validación de entrada (longitud, formato)
+ * - ✅ Escape HTML en la salida
  * - ✅ No direct SQL injection possible
  * 
- * Based on: https://blog.arcjet.com/protecting-your-node-js-app-from-sql-injection-xss-attacks/
+ * Basado en: https://blog.arcjet.com/protecting-your-node-js-app-from-sql-injection-xss-attacks/
  */
+
 export class DatabaseService {
     private db: Database | null = null;
     private static instance: DatabaseService | null = null;
@@ -158,9 +158,10 @@ export class DatabaseService {
     }
 
     /**
-     * 🔒 SECURE: Save template with parameterized query
-     * Uses ? placeholders to prevent SQL injection
+     * 🔒 Seguridad: Guardar template con consulta parametrizada
+     * Utiliza ? marcadores de posición para prevenir inyecciones SQL
      */
+
     async saveTemplate(template: WorkflowTemplate) {
         if (!this.db) throw new Error('Database not initialized');
         
@@ -185,7 +186,7 @@ export class DatabaseService {
     }
 
     /**
-     * 🔒 SECURE: Load template by ID with parameterized query
+     * 🔒 Seguridad: Cargar template por ID con consulta parametrizada
      */
     async loadTemplate(id: number): Promise<WorkflowTemplate | undefined> {
         if (!this.db) throw new Error('Database not initialized');

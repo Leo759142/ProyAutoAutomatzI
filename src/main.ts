@@ -5,6 +5,8 @@ import { defaultTemplates } from './templates/DefaultTemplates';
 import { validateAllTemplates } from './utils/validateTemplates';
 import { SessionManager } from './services/SessionManager';
 import { auditLogPanel } from './ui/AuditLogPanel';
+import { AlgorithmValidationUI } from './ui/AlgorithmValidationUI';
+import { InfoPanel } from './ui/InfoPanel';
 
 document.addEventListener('DOMContentLoaded', () => {
   // 🔍 VALIDAR TODOS LOS TEMPLATES ANTES DE CARGARLOS
@@ -17,6 +19,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Inicializar la UI modular del canvas
   const canvasUI = initCanvasUI();
+  
+  // Inicializar la UI de validación de algoritmos
+  const algorithmUI = new AlgorithmValidationUI(canvasUI.editor);
+  
+  // Inicializar el panel de información con soporte Markdown
+  const infoPanel = new InfoPanel();
+  
+  // Exponer infoPanel globalmente para otros módulos
+  (window as any).infoPanel = infoPanel;
   
   // Inicializar base de datos y guardar templates por defecto
   const dbService = DatabaseService.getInstance();
@@ -224,16 +235,38 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       // Serializar nodos y conexiones
-      const nodesData = canvasUI.editor.nodes.map((node, index) => ({
-        id: index + 1,
-        type: node.type,
-        position: { x: node.pos.x, y: node.pos.y },
-        data: {
-          ...(node.outputs.length > 0 && node.outputs[0].value !== undefined ? { value: node.outputs[0].value } : {}),
-          ...(node.customTitle !== null ? { customTitle: node.customTitle } : {}),
-          ...(node.customDescription !== null ? { customDescription: node.customDescription } : {})
+      const nodesData = canvasUI.editor.nodes.map((node, index) => {
+        const nodeData: any = {
+          id: index + 1,
+          type: node.type,
+          position: { x: node.pos.x, y: node.pos.y },
+          data: {}
+        };
+
+        // Guardar valor del output si existe (para nodos de entrada y Task)
+        if (node.outputs.length > 0 && node.outputs[0].value !== undefined) {
+          nodeData.data.value = node.outputs[0].value;
         }
-      }));
+
+        // Guardar valores de inputs si existen
+        if (node.inputs.length > 0) {
+          const inputValues: any[] = [];
+          node.inputs.forEach(input => {
+            if (input.value !== undefined) {
+              inputValues.push(input.value);
+            }
+          });
+          if (inputValues.length > 0) {
+            nodeData.data.inputValues = inputValues;
+          }
+        }
+
+        // Guardar título y descripción personalizados
+        if (node.customTitle !== null) nodeData.data.customTitle = node.customTitle;
+        if (node.customDescription !== null) nodeData.data.customDescription = node.customDescription;
+
+        return nodeData;
+      });
       
       const connectionsData = canvasUI.editor.links
         .map((link, index) => {
@@ -289,16 +322,38 @@ document.addEventListener('DOMContentLoaded', () => {
       const description = prompt('Descripción (opcional):', '');
       
       // Serializar nodos y conexiones
-      const nodesData = canvasUI.editor.nodes.map((node, index) => ({
-        id: index + 1,
-        type: node.type,
-        position: { x: node.pos.x, y: node.pos.y },
-        data: {
-          ...(node.outputs.length > 0 && node.outputs[0].value !== undefined ? { value: node.outputs[0].value } : {}),
-          ...(node.customTitle !== null ? { customTitle: node.customTitle } : {}),
-          ...(node.customDescription !== null ? { customDescription: node.customDescription } : {})
+      const nodesData = canvasUI.editor.nodes.map((node, index) => {
+        const nodeData: any = {
+          id: index + 1,
+          type: node.type,
+          position: { x: node.pos.x, y: node.pos.y },
+          data: {}
+        };
+
+        // Guardar valor del output si existe (para nodos de entrada y Task)
+        if (node.outputs.length > 0 && node.outputs[0].value !== undefined) {
+          nodeData.data.value = node.outputs[0].value;
         }
-      }));
+
+        // Guardar valores de inputs si existen
+        if (node.inputs.length > 0) {
+          const inputValues: any[] = [];
+          node.inputs.forEach(input => {
+            if (input.value !== undefined) {
+              inputValues.push(input.value);
+            }
+          });
+          if (inputValues.length > 0) {
+            nodeData.data.inputValues = inputValues;
+          }
+        }
+
+        // Guardar título y descripción personalizados
+        if (node.customTitle !== null) nodeData.data.customTitle = node.customTitle;
+        if (node.customDescription !== null) nodeData.data.customDescription = node.customDescription;
+
+        return nodeData;
+      });
       
       const connectionsData = canvasUI.editor.links
         .map((link, index) => {
@@ -372,20 +427,168 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Botón de ayuda
-  if (helpButton && helpPanel) {
-    const closeHelp = document.getElementById('closeHelp');
-    
+  // Botón de ayuda - Ahora usa InfoPanel con Markdown
+  if (helpButton) {
     helpButton.addEventListener('click', () => {
-      const isVisible = helpPanel.style.display !== 'none';
-      helpPanel.style.display = isVisible ? 'none' : 'block';
-      helpButton.textContent = isVisible ? '❓ Ayuda' : '✖️ Cerrar';
+      // Contenido de ayuda en formato Markdown
+      const helpContent = `
+# 📚 Guía de Usuario - Node Editor
+
+Bienvenido al **Node Editor Visual**, una herramienta avanzada para crear y ejecutar flujos de trabajo mediante nodos.
+
+## 🎯 Conceptos Básicos
+
+### ¿Qué es un Nodo?
+Un **nodo** es una unidad de procesamiento que puede:
+- 📥 Recibir datos de otros nodos
+- ⚙️ Procesar información
+- 📤 Enviar resultados a otros nodos
+
+### Tipos de Nodos
+
+| Tipo | Ícono | Descripción |
+|------|-------|-------------|
+| **Input** | 📥 | Nodos de entrada de datos |
+| **Process** | ⚙️ | Nodos de procesamiento |
+| **Output** | 📤 | Nodos de salida |
+| **Condition** | 🔀 | Nodos de decisión |
+| **Database** | 🗄️ | Nodos de base de datos |
+
+---
+
+## 🖱️ Controles del Canvas
+
+### Navegación
+- **Arrastrar**: Click + Arrastrar con botón derecho
+- **Zoom**: Rueda del ratón o control deslizante
+- **Selección**: Click en un nodo
+
+### Conexiones
+1. Click en el **puerto de salida** de un nodo (círculo derecho)
+2. Arrastra hasta el **puerto de entrada** de otro nodo (círculo izquierdo)
+3. Suelta para crear la conexión
+
+> 💡 **Tip**: Las conexiones solo son válidas entre puertos compatibles
+
+---
+
+## 🔄 Ejecución de Flujos
+
+### Modos de Ejecución
+
+#### ⚡ Tiempo Real
+Ejecuta todo el flujo instantáneamente.
+
+\`\`\`
+1. Selecciona "Tiempo Real" en el dropdown
+2. Presiona el botón "Play"
+3. Observa la ejecución en tiempo real
+\`\`\`
+
+#### 🐌 Paso a Paso
+Ejecuta nodo por nodo, ideal para depuración.
+
+\`\`\`
+1. Selecciona "Paso a Paso"
+2. Presiona "Play" para iniciar
+3. Usa los controles para avanzar/retroceder
+\`\`\`
+
+---
+
+## 🗺️ Algoritmos de Rutas
+
+### Algoritmos Disponibles
+
+#### 🔷 Dijkstra
+- **Propósito**: Encontrar el camino más corto
+- **Requisitos**: Grafo con pesos positivos
+- **Ideal para**: Rutas de transporte, costos
+
+#### ⭐ A* (A-Star)
+- **Propósito**: Búsqueda heurística eficiente
+- **Requisitos**: Posiciones de nodos definidas
+- **Ideal para**: Mapas, navegación espacial
+
+#### 📊 PERT/CPM
+- **Propósito**: Gestión de proyectos
+- **Requisitos**: Grafo acíclico dirigido (DAG)
+- **Ideal para**: Planificación de tareas, cronogramas
+
+---
+
+## 🎨 Atajos de Teclado
+
+| Tecla | Acción |
+|-------|--------|
+| \`Ctrl + N\` | Nuevo nodo |
+| \`Delete\` | Eliminar selección |
+| \`Ctrl + Z\` | Deshacer |
+| \`Ctrl + S\` | Guardar template |
+| \`Space\` | Modo mover canvas |
+| \`Esc\` | Cancelar conexión |
+
+---
+
+## 💾 Templates
+
+Los **templates** son configuraciones predefinidas que puedes cargar:
+
+1. Ve al dropdown de "Templates"
+2. Selecciona un template
+3. Click en "Cargar Template"
+4. El canvas se poblará automáticamente
+
+### Crear Tu Propio Template
+1. Diseña tu flujo de nodos
+2. Click en "Guardar como Template"
+3. Dale un nombre y descripción
+4. ¡Listo! Ahora está disponible en la base de datos
+
+---
+
+## 🐛 Solución de Problemas
+
+### El flujo no se ejecuta
+- ✅ Verifica que todos los nodos estén conectados correctamente
+- ✅ Revisa que no haya ciclos (loops infinitos)
+- ✅ Asegúrate de que los nodos de entrada tengan valores
+
+### No puedo conectar dos nodos
+- ✅ Solo puedes conectar salida → entrada
+- ✅ Verifica compatibilidad de tipos de datos
+- ✅ No se permiten conexiones duplicadas
+
+### El algoritmo no está disponible
+- ✅ Revisa el panel de validación
+- ✅ Algunos algoritmos requieren estructuras específicas
+- ✅ Lee las sugerencias del panel de validación
+
+---
+
+## 📖 Más Información
+
+Para documentación detallada, consulta los archivos **.md** en la raíz del proyecto:
+
+- 📄 \`QUICK_START.md\` - Inicio rápido
+- 📄 \`ALGORITHM_VALIDATION_ANALYSIS.md\` - Análisis de algoritmos
+- 📄 \`WEIGHT_EDITING_GUIDE.md\` - Edición de pesos
+
+---
+
+**¿Necesitas más ayuda?** Abre la consola del navegador (F12) para ver logs detallados.
+`;
+      
+      infoPanel.showMarkdown(helpContent, 'Guía de Usuario', '📚');
     });
-    
+  }
+  
+  // Mantener compatibilidad con el panel de ayuda antiguo (si existe)
+  if (helpPanel) {
+    const closeHelp = document.getElementById('closeHelp');
     if (closeHelp) {
       closeHelp.addEventListener('click', () => {
         helpPanel.style.display = 'none';
-        helpButton.textContent = '❓ Ayuda';
       });
     }
   }
@@ -398,101 +601,52 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Botón Ejecutar Algoritmo de Ruta Óptima
-  const executePathAlgorithmBtn = document.getElementById('executePathAlgorithm') as HTMLButtonElement;
-  const pathAlgorithmSelect = document.getElementById('pathAlgorithmSelect') as HTMLSelectElement;
-  
-  if (executePathAlgorithmBtn && pathAlgorithmSelect) {
-    executePathAlgorithmBtn.addEventListener('click', async () => {
-      const algorithm = pathAlgorithmSelect.value;
+  // Botón de información de algoritmo
+  const algorithmInfoBtn = document.getElementById('algorithmInfoButton') as HTMLButtonElement;
+  if (algorithmInfoBtn) {
+    algorithmInfoBtn.addEventListener('click', () => {
+      const algorithmSelect = document.getElementById('pathAlgorithmSelect') as HTMLSelectElement;
+      const selectedAlgorithm = algorithmSelect?.value;
       
-      if (!algorithm) {
-        alert('⚠️ Por favor selecciona un algoritmo primero.');
+      if (!selectedAlgorithm) {
+        infoPanel.showInfo([{
+          title: 'Selecciona un Algoritmo',
+          icon: '🎯',
+          markdown: 'Por favor, selecciona un algoritmo del menú desplegable para ver información detallada.'
+        }]);
         return;
       }
       
-      // Importar algoritmos dinámicamente
-      const { dijkstra, aStar, pertCPM } = await import('./algorithms/PathAlgorithms');
-      
-      logAudit(`\n🚀 ========== EJECUTANDO ALGORITMO: ${algorithm.toUpperCase()} ==========`);
-      
-      let result;
-      
-      switch (algorithm) {
-        case 'dijkstra':
-          result = dijkstra(canvasUI.editor);
-          break;
-        case 'astar':
-          result = aStar(canvasUI.editor);
-          break;
-        case 'pertcpm':
-          result = pertCPM(canvasUI.editor);
-          break;
-        default:
-          alert('❌ Algoritmo no reconocido.');
-          return;
-      }
-      
-      // Mostrar resultado
-      logAudit(`\n${result.message}`);
-      
-      if (result.success) {
-        logAudit(`\n📊 Detalles del algoritmo ${result.algorithm}:`);
-        
-        // Limpiar highlighting previo
-        canvasUI.editor.nodes.forEach(node => {
-          if (node.userData) {
-            node.userData.pathHighlight = false;
-            node.userData.isInOptimalPath = false;
-          }
-        });
-        
-        if (result.path) {
-          logAudit(`  • Camino: [${result.path.join(' → ')}]`);
-          logAudit(`  • Distancia/Costo: ${result.distance}`);
-          
-          // RESALTAR NODOS DEL CAMINO ÓPTIMO (Dijkstra/A*)
-          result.path.forEach((nodeIndex: number) => {
-            const node = canvasUI.editor.nodes[nodeIndex];
-            if (node) {
-              if (!node.userData) node.userData = {};
-              node.userData.pathHighlight = true;
-              node.userData.isInOptimalPath = true;
-            }
-          });
-          
-          logAudit(`  ✨ ${result.path.length} nodos resaltados en cyan en el canvas`);
-        }
-        
-        if (result.criticalPath) {
-          logAudit(`  • Ruta Crítica: [${result.criticalPath.join(' → ')}]`);
-          logAudit(`  • Tiempo Total: ${result.totalTime}`);
-          
-          // RESALTAR NODOS DE LA RUTA CRÍTICA (PERT/CPM)
-          result.criticalPath.forEach((nodeIndex: number) => {
-            const node = canvasUI.editor.nodes[nodeIndex];
-            if (node) {
-              if (!node.userData) node.userData = {};
-              node.userData.pathHighlight = true;
-              node.userData.isInOptimalPath = true;
-            }
-          });
-          
-          logAudit(`  ✨ ${result.criticalPath.length} nodos críticos resaltados en cyan en el canvas`);
-        }
-        
-        if (result.details?.analysisTable) {
-          logAudit(`\n📋 Tabla de Análisis PERT/CPM:`);
-          console.table(result.details.analysisTable);
-        }
-      }
-      
-      logAudit('========================================\n');
-      
-      // Mostrar resultado en alert
-      alert(result.message);
+      showAlgorithmInfo(selectedAlgorithm);
     });
   }
+
+  // Botón Ejecutar Algoritmo de Ruta Óptima
+  // NOTA: El evento ahora es manejado por AlgorithmValidationUI, pero mantenemos
+  // la lógica de highlighting aquí para compatibilidad
+  const pathAlgorithmSelect = document.getElementById('pathAlgorithmSelect') as HTMLSelectElement;
+  
+  // Actualizar validación cuando cambie la selección
+  if (pathAlgorithmSelect) {
+    pathAlgorithmSelect.addEventListener('change', () => {
+      algorithmUI.updateValidation();
+    });
+  }
+  
+  // Monitorear cambios en el editor para actualizar validación
+  // (por ejemplo, cuando se agregan/eliminan nodos o conexiones)
+  const originalAddNode = canvasUI.editor.addNode.bind(canvasUI.editor);
+  canvasUI.editor.addNode = function(...args) {
+    const result = originalAddNode(...args);
+    algorithmUI.updateValidation();
+    return result;
+  };
+  
+  const originalClearCanvas = canvasUI.editor.clearCanvas.bind(canvasUI.editor);
+  canvasUI.editor.clearCanvas = function() {
+    originalClearCanvas();
+    algorithmUI.updateValidation();
+  };
 
   // Botón Reset Highlights
   const resetHighlightsBtn = document.getElementById('resetHighlights') as HTMLButtonElement;
@@ -686,4 +840,91 @@ Ver consola y panel de auditoría para detalles completos.
   `.trim();
   
   alert(summary);
+}
+
+// Mostrar información detallada de algoritmos en el InfoPanel
+function showAlgorithmInfo(algorithm: string) {
+  const infoPanel = (window as any).infoPanel;
+  if (!infoPanel) return;
+
+  if (algorithm === 'dijkstra') {
+    infoPanel.showMarkdown(`
+# 🔷 Dijkstra
+
+El algoritmo de **Dijkstra** encuentra el camino más corto entre dos nodos en un grafo con pesos positivos.
+
+- **Ventajas:**
+  - Garantiza el camino más corto
+  - Rápido en grafos pequeños/medianos
+- **Limitaciones:**
+  - No soporta pesos negativos
+  - No usa heurística
+
+## Requisitos
+- Grafo dirigido o no dirigido
+- Pesos positivos en todas las aristas
+
+## Uso típico
+- Rutas de transporte
+- Optimización de costos
+
+## Referencias
+- [Wikipedia: Dijkstra](https://es.wikipedia.org/wiki/Algoritmo_de_Dijkstra)
+`,'Dijkstra','🔷');
+  } else if (algorithm === 'astar') {
+    infoPanel.showMarkdown(`
+# ⭐ A* (A-Star)
+
+El algoritmo **A\*** combina búsqueda de costo y heurística para encontrar rutas óptimas de forma eficiente.
+
+- **Ventajas:**
+  - Muy eficiente en mapas espaciales
+  - Permite heurísticas personalizadas
+- **Limitaciones:**
+  - Requiere posiciones (coordenadas) de nodos
+  - La heurística debe ser admisible
+
+## Requisitos
+- Grafo con posiciones conocidas
+- Heurística definida (por ejemplo, distancia Euclídea)
+
+## Uso típico
+- Navegación en mapas
+- Juegos y robótica
+
+## Referencias
+- [Wikipedia: A*](https://es.wikipedia.org/wiki/Algoritmo_A*)
+`,'A*','⭐');
+  } else if (algorithm === 'pertcpm') {
+    infoPanel.showMarkdown(`
+# 📊 PERT/CPM
+
+**PERT** (Program Evaluation and Review Technique) y **CPM** (Critical Path Method) son algoritmos para planificación y gestión de proyectos.
+
+- **Ventajas:**
+  - Permite estimar tiempos y riesgos
+  - Identifica la ruta crítica
+- **Limitaciones:**
+  - Solo funciona en grafos acíclicos dirigidos (DAG)
+  - Requiere estimaciones optimista, probable y pesimista
+
+## Requisitos
+- Grafo acíclico dirigido
+- Tareas con estimaciones O/M/P
+
+## Uso típico
+- Cronogramas de proyectos
+- Gestión de tareas complejas
+
+## Referencias
+- [Wikipedia: PERT](https://es.wikipedia.org/wiki/PERT)
+- [Wikipedia: CPM](https://es.wikipedia.org/wiki/Método_de_la_ruta_crítica)
+`,'PERT/CPM','📊');
+  } else {
+    infoPanel.showInfo([{
+      title: 'Algoritmo no reconocido',
+      icon: '❓',
+      markdown: 'No se encontró información para el algoritmo seleccionado.'
+    }]);
+  }
 }

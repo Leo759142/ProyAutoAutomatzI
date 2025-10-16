@@ -169,17 +169,29 @@ export function handleMouseDown(manager: any, e: MouseEvent) {
             let sourcePin = fromPin.isInput ? toPin : fromPin;
             let targetPin = fromPin.isInput ? fromPin : toPin;
             
-            // IMPORTANTE: Si el pin de entrada ya tiene conexión, eliminarla primero
-            if (targetPin.userData !== null && targetPin.userData !== undefined) {
+            // Solo eliminar conexión anterior del INPUT si NO permite múltiples
+            if (!targetPin.definition.allowMultiple && targetPin.userData !== null && targetPin.userData !== undefined) {
               const oldIndex = targetPin.userData;
               if (manager.editor.links[oldIndex]) {
-                console.log(`🗑️ Eliminando conexión anterior del pin ${targetPin.name}`);
-                // Limpiar userData de ambos pines de la conexión anterior
+                console.log(`🗑️ Eliminando conexión anterior del pin INPUT ${targetPin.name} (no permite múltiples)`);
                 const oldLink = manager.editor.links[oldIndex];
                 if (oldLink[0]) oldLink[0].userData = null;
                 if (oldLink[1]) oldLink[1].userData = null;
-                manager.editor.links[oldIndex] = null; // Marcar como eliminado
+                manager.editor.links[oldIndex] = null;
               }
+            }
+            
+            // Solo eliminar conexiones anteriores del OUTPUT si NO permite múltiples
+            if (!sourcePin.definition.allowMultiple && sourcePin.userData !== null && sourcePin.userData !== undefined) {
+              // Eliminar todas las conexiones del output si no permite múltiples
+              manager.editor.links.forEach((link: any, idx: number) => {
+                if (link && link[0] === sourcePin) {
+                  console.log(`🗑️ Eliminando conexión anterior del pin OUTPUT ${sourcePin.name} (no permite múltiples)`);
+                  if (link[0]) link[0].userData = null;
+                  if (link[1]) link[1].userData = null;
+                  manager.editor.links[idx] = null;
+                }
+              });
             }
             
             console.log(`🔗 Conectando: ${sourcePin.parent.title}.${sourcePin.name} → ${targetPin.parent.title}.${targetPin.name}`);

@@ -78,12 +78,27 @@
                 </div>
                 <div class="toolbar-row">
                     <div class="toolbar-group left">
+                        <select id="problemContextSelect" title="Contexto del problema y unidades">
+                            <option value="generic">🎯 Genérico (sin unidad)</option>
+                            <option value="transportation">🚗 Transporte (km)</option>
+                            <option value="projectScheduling">📅 Proyecto (días)</option>
+                            <option value="constructionProject">🏗️ Construcción (semanas)</option>
+                            <option value="costAnalysis">💰 Costos (USD)</option>
+                            <option value="logistics">📦 Logística (horas)</option>
+                        </select>
                         <select id="pathAlgorithmSelect" title="Seleccionar algoritmo de ruta óptima">
                             <option value="">🎯 Algoritmo</option>
-                            <option value="dijkstra">🔷 Dijkstra (Camino más corto)</option>
-                            <option value="astar">⭐ A* (Heurística)</option>
-                            <option value="pertcpm">📊 PERT/CPM (Ruta crítica)</option>
+                            <option value="dijkstra" data-status="">🔷 Dijkstra</option>
+                            <option value="astar" data-status="">⭐ A*</option>
+                            <option value="pertcpm" data-status="">📊 PERT/CPM</option>
                         </select>
+                        <button id="algorithmInfoButton" title="Ver información detallada del algoritmo seleccionado">
+                            <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="2" fill="none"/>
+                                <text x="10" y="15" text-anchor="middle" font-size="12" fill="currentColor" font-weight="bold">i</text>
+                            </svg>
+                            <span>ℹ️ Info</span>
+                        </button>
                         <button id="executePathAlgorithm" title="Ejecutar algoritmo seleccionado">
                             <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <circle cx="4" cy="10" r="2" fill="#4CAF50"/>
@@ -91,7 +106,8 @@
                                 <path d="M 6 10 Q 10 5, 14 10" stroke="#2196F3" stroke-width="2" fill="none"/>
                                 <circle cx="10" cy="7" r="1.5" fill="#FFC107"/>
                             </svg>
-                            <span>▶ Ejecutar</span>
+                            <span id="executeButtonText">▶ Ejecutar</span>
+                            <span id="algorithmStatusIcon" style="margin-left: 4px;"></span>
                         </button>
                         <button id="analyzeOptimalPath" title="Analizar capacidad de rutas óptimas">
                             <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -392,6 +408,42 @@
                 <div class="help-section help-footer">
                     <p>📚 <strong>Más info:</strong> Revisa archivos .md en la raíz del proyecto</p>
                     <p>🐛 <strong>Problemas?</strong> Verifica la consola del navegador (F12)</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Panel de Validación de Algoritmos y Resultados PERT -->
+        <div id="algorithmPanel" class="algorithm-panel" style="display: none;">
+            <div class="algorithm-panel-header">
+                <h3 id="algorithmPanelTitle">🔍 Validación de Algoritmos</h3>
+                <button id="closeAlgorithmPanel" class="close-button">✕</button>
+            </div>
+            <div class="algorithm-panel-content">
+                <!-- Sección de validación -->
+                <div id="validationSection" class="panel-section">
+                    <h4>📊 Estado de Aplicabilidad</h4>
+                    <div id="validationResults"></div>
+                </div>
+                
+                <!-- Sección de resultados PERT -->
+                <div id="pertResultsSection" class="panel-section" style="display: none;">
+                    <h4>📊 Resultados PERT/CPM</h4>
+                    <div id="pertResults"></div>
+                    
+                    <!-- Gráfica de intervalos de confianza -->
+                    <div id="confidenceChart" style="display: none;">
+                        <h5>⏱️ Intervalos de Confianza</h5>
+                        <div class="confidence-visualization">
+                            <canvas id="confidenceCanvas" width="400" height="200"></canvas>
+                        </div>
+                        <div id="confidenceDetails"></div>
+                    </div>
+                </div>
+                
+                <!-- Sección de resultados genéricos (Dijkstra/A*) -->
+                <div id="pathResultsSection" class="panel-section" style="display: none;">
+                    <h4>🗺️ Resultados del Algoritmo</h4>
+                    <div id="pathResults"></div>
                 </div>
             </div>
         </div>

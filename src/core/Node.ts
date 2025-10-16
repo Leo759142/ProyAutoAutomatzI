@@ -29,6 +29,18 @@ export class Pin {
   }
 }
 
+/**
+ * Datos PERT para nodos task
+ */
+export interface PertData {
+  optimistic?: number;      // Tiempo optimista (O)
+  mostLikely?: number;      // Tiempo más probable (M)
+  pessimistic?: number;     // Tiempo pesimista (P)
+  expectedTime?: number;    // Tiempo esperado calculado: (O + 4M + P) / 6
+  variance?: number;        // Varianza calculada: ((P - O) / 6)²
+  stdDev?: number;          // Desviación estándar: √variance
+}
+
 export class Node {
   pos: Vec2 = new Vec2();
   selected: boolean = false;
@@ -45,6 +57,8 @@ export class Node {
   public customTitle: string | null = null;
   // Descripción personalizada editable por el usuario
   public customDescription: string | null = null;
+  // Datos PERT para análisis de varianza (solo para nodos task)
+  public pertData?: PertData;
 
   constructor(private definition: NodeDefinition) {
   // Tamaño base aumentado para mejor visibilidad

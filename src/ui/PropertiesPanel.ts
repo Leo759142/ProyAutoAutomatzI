@@ -192,6 +192,210 @@ export class PropertiesPanel {
         inputPropertiesContainer.appendChild(propertyGroup);
       });
     }
+
+    // ========== SECCIÓN PERT PARA NODOS TASK ==========
+    // Renderizar campos de estimación PERT si es un nodo task
+    if (this.currentNode && this.currentNode.type === 'task') {
+      this.renderPertEstimations(inputPropertiesContainer);
+    }
+  }
+
+  /**
+   * Renderiza los campos de estimación PERT (optimista, más probable, pesimista)
+   */
+  private renderPertEstimations(container: HTMLElement) {
+    if (!this.currentNode) return;
+
+    const pertSection = document.createElement('div');
+    pertSection.className = 'pert-estimation-section';
+    pertSection.style.cssText = `
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 2px solid rgba(255, 255, 255, 0.1);
+    `;
+
+    const pertTitle = document.createElement('h4');
+    pertTitle.innerHTML = '📊 Estimaciones PERT (Opcional)';
+    pertTitle.style.cssText = `
+      margin: 0 0 10px 0;
+      color: #4CAF50;
+      font-size: 14px;
+      font-weight: 600;
+    `;
+    pertSection.appendChild(pertTitle);
+
+    const pertDescription = document.createElement('p');
+    pertDescription.textContent = 'Configura tres estimaciones de tiempo para análisis de varianza:';
+    pertDescription.style.cssText = `
+      margin: 0 0 15px 0;
+      font-size: 12px;
+      opacity: 0.7;
+      line-height: 1.4;
+    `;
+    pertSection.appendChild(pertDescription);
+
+    // Inicializar pertData si no existe
+    if (!this.currentNode.pertData) {
+      this.currentNode.pertData = {};
+    }
+
+    const pertData = this.currentNode.pertData;
+
+    // Campo Optimista
+    const optimisticGroup = this.createPertField(
+      'optimistic',
+      '⚡ Tiempo Optimista (O):',
+      pertData.optimistic,
+      'Mejor escenario posible'
+    );
+    pertSection.appendChild(optimisticGroup);
+
+    // Campo Más Probable
+    const mostLikelyGroup = this.createPertField(
+      'mostLikely',
+      '🎯 Tiempo Más Probable (M):',
+      pertData.mostLikely,
+      'Escenario más realista'
+    );
+    pertSection.appendChild(mostLikelyGroup);
+
+    // Campo Pesimista
+    const pessimisticGroup = this.createPertField(
+      'pessimistic',
+      '🐌 Tiempo Pesimista (P):',
+      pertData.pessimistic,
+      'Peor escenario esperado'
+    );
+    pertSection.appendChild(pessimisticGroup);
+
+    // Sección de valores calculados
+    const calculatedSection = document.createElement('div');
+    calculatedSection.className = 'pert-calculated';
+    calculatedSection.style.cssText = `
+      margin-top: 15px;
+      padding: 10px;
+      background: rgba(76, 175, 80, 0.1);
+      border-radius: 6px;
+      border-left: 3px solid #4CAF50;
+    `;
+
+    const calculatedTitle = document.createElement('div');
+    calculatedTitle.innerHTML = '<strong>📐 Valores Calculados:</strong>';
+    calculatedTitle.style.cssText = `
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: #4CAF50;
+    `;
+    calculatedSection.appendChild(calculatedTitle);
+
+    // Calcular valores si hay datos completos
+    this.updatePertCalculations(calculatedSection);
+
+    pertSection.appendChild(calculatedSection);
+    container.appendChild(pertSection);
+
+    // Agregar listeners para recalcular cuando cambien los valores
+    ['optimistic', 'mostLikely', 'pessimistic'].forEach(field => {
+      const input = container.querySelector(`input[data-pert-field="${field}"]`) as HTMLInputElement;
+      if (input) {
+        input.addEventListener('input', () => {
+          this.updatePertCalculations(calculatedSection);
+        });
+      }
+    });
+  }
+
+  /**
+   * Crea un campo de entrada PERT
+   */
+  private createPertField(fieldName: string, label: string, value: number | undefined, hint: string): HTMLElement {
+    const group = document.createElement('div');
+    group.className = 'property-group';
+
+    const labelEl = document.createElement('label');
+    labelEl.textContent = label;
+    group.appendChild(labelEl);
+
+    const inputDiv = document.createElement('div');
+    inputDiv.className = 'property-input';
+
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '0';
+    input.step = '0.1';
+    input.value = value !== undefined ? value.toString() : '';
+    input.placeholder = 'Ej: 5';
+    input.dataset.pertField = fieldName;
+    input.style.width = '100%';
+    inputDiv.appendChild(input);
+
+    const hintEl = document.createElement('div');
+    hintEl.className = 'input-hint';
+    hintEl.textContent = hint;
+    inputDiv.appendChild(hintEl);
+
+    group.appendChild(inputDiv);
+    return group;
+  }
+
+  /**
+   * Actualiza los cálculos PERT mostrados
+   */
+  private updatePertCalculations(container: HTMLElement) {
+    // Obtener valores actuales de los inputs
+    const optimisticInput = document.querySelector('input[data-pert-field="optimistic"]') as HTMLInputElement;
+    const mostLikelyInput = document.querySelector('input[data-pert-field="mostLikely"]') as HTMLInputElement;
+    const pessimisticInput = document.querySelector('input[data-pert-field="pessimistic"]') as HTMLInputElement;
+
+    if (!optimisticInput || !mostLikelyInput || !pessimisticInput) return;
+
+    const O = parseFloat(optimisticInput.value);
+    const M = parseFloat(mostLikelyInput.value);
+    const P = parseFloat(pessimisticInput.value);
+
+    // Limpiar contenido previo (excepto el título)
+    const title = container.querySelector('div:first-child');
+    container.innerHTML = '';
+    if (title) container.appendChild(title);
+
+    if (!isNaN(O) && !isNaN(M) && !isNaN(P) && O >= 0 && M >= 0 && P >= 0) {
+      // Validar que O <= M <= P
+      if (O > M || M > P) {
+        const warning = document.createElement('div');
+        warning.innerHTML = '⚠️ <em>Se esperaba: Optimista ≤ Más Probable ≤ Pesimista</em>';
+        warning.style.cssText = 'color: #FFA726; font-size: 12px; margin-top: 5px;';
+        container.appendChild(warning);
+        return;
+      }
+
+      // Fórmula PERT: TE = (O + 4M + P) / 6
+      const expectedTime = (O + 4 * M + P) / 6;
+
+      // Fórmula de varianza: σ² = ((P - O) / 6)²
+      const variance = Math.pow((P - O) / 6, 2);
+
+      // Desviación estándar: σ = √(varianza)
+      const stdDev = Math.sqrt(variance);
+
+      // Mostrar resultados
+      const results = document.createElement('div');
+      results.style.cssText = 'font-size: 12px; line-height: 1.8;';
+      results.innerHTML = `
+        <div><strong>Tiempo Esperado (TE):</strong> ${expectedTime.toFixed(2)} unidades</div>
+        <div><strong>Varianza (σ²):</strong> ${variance.toFixed(4)}</div>
+        <div><strong>Desviación Estándar (σ):</strong> ${stdDev.toFixed(2)} unidades</div>
+        <div style="margin-top: 8px; opacity: 0.7; font-size: 11px;">
+          <em>Fórmula: TE = (O + 4M + P) / 6</em><br>
+          <em>Varianza: ((P - O) / 6)²</em>
+        </div>
+      `;
+      container.appendChild(results);
+    } else {
+      const placeholder = document.createElement('div');
+      placeholder.innerHTML = '<em>Completa los tres campos para ver los cálculos</em>';
+      placeholder.style.cssText = 'opacity: 0.5; font-size: 12px; font-style: italic;';
+      container.appendChild(placeholder);
+    }
   }
 
   /**
@@ -304,11 +508,53 @@ export class PropertiesPanel {
       }
     });
 
+    // ========== GUARDAR DATOS PERT PARA NODOS TASK ==========
+    if (this.currentNode.type === 'task') {
+      const optimisticInput = document.querySelector('input[data-pert-field="optimistic"]') as HTMLInputElement;
+      const mostLikelyInput = document.querySelector('input[data-pert-field="mostLikely"]') as HTMLInputElement;
+      const pessimisticInput = document.querySelector('input[data-pert-field="pessimistic"]') as HTMLInputElement;
+
+      if (optimisticInput && mostLikelyInput && pessimisticInput) {
+        const O = parseFloat(optimisticInput.value);
+        const M = parseFloat(mostLikelyInput.value);
+        const P = parseFloat(pessimisticInput.value);
+
+        // Si hay valores válidos, guardarlos
+        if (!isNaN(O) && !isNaN(M) && !isNaN(P) && O >= 0 && M >= 0 && P >= 0) {
+          if (!this.currentNode.pertData) {
+            this.currentNode.pertData = {};
+          }
+          
+          this.currentNode.pertData.optimistic = O;
+          this.currentNode.pertData.mostLikely = M;
+          this.currentNode.pertData.pessimistic = P;
+
+          console.log('📊 Datos PERT guardados:', {
+            optimistic: O,
+            mostLikely: M,
+            pessimistic: P
+          });
+        } else if (optimisticInput.value === '' && mostLikelyInput.value === '' && pessimisticInput.value === '') {
+          // Si todos los campos están vacíos, limpiar pertData
+          if (this.currentNode.pertData) {
+            delete this.currentNode.pertData.optimistic;
+            delete this.currentNode.pertData.mostLikely;
+            delete this.currentNode.pertData.pessimistic;
+            delete this.currentNode.pertData.expectedTime;
+            delete this.currentNode.pertData.variance;
+            delete this.currentNode.pertData.stdDev;
+          }
+          console.log('🗑️ Datos PERT eliminados');
+        }
+      }
+    }
+
     console.log('✅ Propiedades aplicadas:', {
       node: this.currentNode.title,
       description: this.currentNode.description,
       inputs: this.currentNode.inputs.map(p => ({ name: p.name, value: p.value })),
-      outputs: this.currentNode.outputs.map(p => ({ name: p.name, value: p.value }))
+      outputs: this.currentNode.outputs.map(p => ({ name: p.name, value: p.value })),
+      pertData: this.currentNode.pertData
     });
 
     // ✅ FIX: Ejecutar computeAll para propagar los cambios inmediatamente

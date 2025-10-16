@@ -1,7 +1,6 @@
 import { Vec2, InputState, PinType } from '../types/types';
 import { Node, Pin } from './Node';
 import { logAudit } from '../main';
-import { RedisService, SessionData } from '../services/RedisService';
 import { NodeTypes } from './NodeTypes';
 import { ExecutionPluginManager } from './ExecutionPlugin';
 import { BuiltinPlugins } from './plugins/BuiltinPlugins';
@@ -119,11 +118,24 @@ export class NodeEditor {
         if (node) {
           // Aplicar datos personalizados al nodo
           if (nodeData.data) {
+            // Restaurar valor del output si existe (para nodos de entrada y Task)
             if (nodeData.data.value !== undefined && node.outputs.length > 0) {
               node.outputs[0].value = nodeData.data.value;
-              logAudit(`  ✓ Valor inicial del nodo: ${nodeData.data.value}`);
-              console.log(`  ✓ Valor inicial del nodo: ${nodeData.data.value}`);
+              logAudit(`  ✓ Valor output[0]: ${nodeData.data.value}`);
+              console.log(`  ✓ Valor output[0]: ${nodeData.data.value}`);
             }
+            
+            // Restaurar valores de inputs si existen
+            if (nodeData.data.inputValues && Array.isArray(nodeData.data.inputValues)) {
+              nodeData.data.inputValues.forEach((val: any, idx: number) => {
+                if (node.inputs[idx] && val !== undefined) {
+                  node.inputs[idx].value = val;
+                  logAudit(`  ✓ Valor input[${idx}]: ${val}`);
+                  console.log(`  ✓ Valor input[${idx}]: ${val}`);
+                }
+              });
+            }
+            
             // Restaurar título personalizado si existe
             if (nodeData.data.customTitle !== undefined) {
               node.customTitle = nodeData.data.customTitle;
@@ -138,7 +150,7 @@ export class NodeEditor {
             }
             // Aplicar otras propiedades personalizadas
             for (const key in nodeData.data) {
-              if (key !== 'value' && key !== 'customTitle' && key !== 'customDescription' && nodeData.data.hasOwnProperty(key) && key in node) {
+              if (key !== 'value' && key !== 'inputValues' && key !== 'customTitle' && key !== 'customDescription' && nodeData.data.hasOwnProperty(key) && key in node) {
                 (node as any)[key] = nodeData.data[key];
               }
             }
@@ -505,17 +517,39 @@ export class NodeEditor {
           
           // Validar conexión
           if (this.validateConnection(fromPin, toPin)) {
-            // Eliminar conexión existente en el pin de entrada si existe
-            const existingLinkIndex = this.links.findIndex(link => 
-              link && link[1] === toPin
-            );
-            if (existingLinkIndex >= 0) {
-              const oldLink = this.links[existingLinkIndex];
-              if (oldLink && oldLink[0] && oldLink[1]) {
-                oldLink[0].userData = null;
-                oldLink[1].userData = null;
+            // Eliminar conexiones previas según las restricciones de cada pin
+            
+            // Si el pin de ENTRADA no permite múltiples, eliminar su conexión previa
+            if (!toPin.definition.allowMultiple) {
+              const existingLinkIndex = this.links.findIndex(link => 
+                link && link[1] === toPin
+              );
+              if (existingLinkIndex >= 0) {
+                const oldLink = this.links[existingLinkIndex];
+                if (oldLink && oldLink[0] && oldLink[1]) {
+                  oldLink[0].userData = null;
+                  oldLink[1].userData = null;
+                }
+                this.links[existingLinkIndex] = [null, null];
               }
-              this.links[existingLinkIndex] = [null, null];
+            }
+            
+            // Si el pin de SALIDA no permite múltiples, eliminar sus conexiones previas
+            if (!fromPin.definition.allowMultiple) {
+              const existingLinksIndices: number[] = [];
+              this.links.forEach((link, index) => {
+                if (link && link[0] === fromPin) {
+                  existingLinksIndices.push(index);
+                }
+              });
+              existingLinksIndices.forEach(index => {
+                const oldLink = this.links[index];
+                if (oldLink && oldLink[0] && oldLink[1]) {
+                  oldLink[0].userData = null;
+                  oldLink[1].userData = null;
+                }
+                this.links[index] = [null, null];
+              });
             }
             
             // Crear nueva conexión
@@ -553,13 +587,26 @@ export class NodeEditor {
       return false;
     }
 
-    // Verificar que la entrada no esté ya conectada (a menos que permita múltiples)
-    const existingConnection = this.links.find(link => 
-      link && link[1] === to && !to.definition.allowMultiple
-    );
-    if (existingConnection) {
-      console.warn('La entrada ya está conectada');
-      return false;
+    // Validar múltiples conexiones en el INPUT (to)
+    if (!to.definition.allowMultiple) {
+      const existingConnection = this.links.find(link => 
+        link && link[0] && link[1] && link[1] === to
+      );
+      if (existingConnection) {
+        console.warn('La entrada ya está conectada y no permite múltiples');
+        return false;
+      }
+    }
+
+    // Validar múltiples conexiones en el OUTPUT (from)
+    if (!from.definition.allowMultiple) {
+      const existingConnection = this.links.find(link => 
+        link && link[0] && link[1] && link[0] === from
+      );
+      if (existingConnection) {
+        console.warn('La salida ya está conectada y no permite múltiples');
+        return false;
+      }
     }
 
     return true;
@@ -739,7 +786,15 @@ export class NodeEditor {
 
     // NO resetear valores de nodos input (number, boolean)
     // Solo resetear inputs de nodos que reciben conexiones
+    // EXCEPCIÓN: Nodos con inputs editables por el usuario (task, etc.) NO se resetean
+    const userEditableTypes = ['task', 'number', 'boolean', 'string'];
+    
     this.nodes.forEach(node => {
+      // Si es un nodo con inputs editables por el usuario, NO resetear
+      if (userEditableTypes.includes(node.type)) {
+        return; // Saltar este nodo
+      }
+      
       if (node.inputs.length > 0) {
         node.inputs.forEach(pin => {
           // Resetear solo si no está conectado
