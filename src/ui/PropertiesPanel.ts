@@ -406,9 +406,13 @@ export class PropertiesPanel {
 
     switch (pinType) {
       case PinType.Number:
-        input.type = 'number';
-        input.value = currentValue?.toString() || '0';
-        input.step = 'any'; // Permite decimales
+        input.type = 'text';
+        input.inputMode = 'decimal';
+        input.autocomplete = 'off';
+        input.autocapitalize = 'none';
+        input.spellcheck = false;
+        input.placeholder = 'Ej: 5, 3.5 o 2/3';
+        input.value = this.formatNumberValue(currentValue);
         break;
 
       case PinType.Boolean:
@@ -436,7 +440,7 @@ export class PropertiesPanel {
   private getHintForType(pinType: PinType): string {
     switch (pinType) {
       case PinType.Number:
-        return 'Ingresa un número (entero o decimal)';
+        return 'Ingresa un valor numérico (decimales o fracciones como 2/3)';
       case PinType.Boolean:
         return 'Activa/desactiva el checkbox';
       case PinType.String:
@@ -446,6 +450,54 @@ export class PropertiesPanel {
       default:
         return '';
     }
+  }
+
+  private formatNumberValue(value: any): string {
+    if (value === undefined || value === null) {
+      return '';
+    }
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      const normalized = Math.abs(value) < 1e-9 ? 0 : Number(value.toFixed(6));
+      return normalized.toString();
+    }
+
+    const stringValue = value.toString().trim();
+    return stringValue;
+  }
+
+  private parseNumericValue(rawValue: string): number | null {
+    const trimmed = rawValue.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    const normalized = trimmed.replace(',', '.');
+
+    const mixedMatch = normalized.match(/^([+-]?\d+)\s+(\d+)\s*\/\s*(\d+)$/);
+    if (mixedMatch) {
+      const whole = parseInt(mixedMatch[1], 10);
+      const numerator = parseInt(mixedMatch[2], 10);
+      const denominator = parseInt(mixedMatch[3], 10);
+      if (Number.isNaN(whole) || Number.isNaN(numerator) || Number.isNaN(denominator) || denominator === 0) {
+        return null;
+      }
+      const fraction = numerator / denominator;
+      return whole >= 0 ? whole + fraction : whole - fraction;
+    }
+
+    const fractionMatch = normalized.match(/^([+-]?\d+(?:\.\d+)?)\s*\/\s*([+-]?\d+(?:\.\d+)?)$/);
+    if (fractionMatch) {
+      const numerator = parseFloat(fractionMatch[1]);
+      const denominator = parseFloat(fractionMatch[2]);
+      if (Number.isNaN(numerator) || Number.isNaN(denominator) || denominator === 0) {
+        return null;
+      }
+      return numerator / denominator;
+    }
+
+    const parsed = Number(normalized);
+    return Number.isNaN(parsed) ? null : parsed;
   }
 
   /**
@@ -493,9 +545,9 @@ export class PropertiesPanel {
             // Si el campo está vacío, NO modificar el valor
             break;
           }
-          const numValue = parseFloat(inputElement.value);
-          if (!isNaN(numValue)) {
-            pin.value = numValue;
+          const parsedValue = this.parseNumericValue(inputElement.value);
+          if (parsedValue !== null) {
+            pin.value = parsedValue;
           }
           break;
         case PinType.Boolean:

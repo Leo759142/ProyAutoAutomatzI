@@ -26,6 +26,32 @@ export interface GraphNode {
     edges: { target: number; weight: number }[];
 }
 
+const PERT_EPSILON = 1e-6;
+
+function normalizePertValue(value: number): number {
+    if (!Number.isFinite(value)) {
+        return value;
+    }
+    if (Math.abs(value) < PERT_EPSILON) {
+        return 0;
+    }
+    return Number(value.toFixed(6));
+}
+
+function setPertMetric(map: Map<number, number>, key: number, value: number): void {
+    map.set(key, normalizePertValue(value));
+}
+
+function formatPertNumber(value: number, fractionDigits = 2): string {
+    const locale = (typeof navigator !== 'undefined' && navigator.language)
+        ? navigator.language
+        : 'es-ES';
+    return new Intl.NumberFormat(locale, {
+        minimumFractionDigits: fractionDigits,
+        maximumFractionDigits: fractionDigits
+    }).format(value);
+}
+
 /**
  * Convierte el editor de nodos en un grafo con pesos para Dijkstra/A*
  * Usa los pesos de las CONEXIONES (templateConnections) si existen
@@ -702,6 +728,50 @@ export function aStar(editor: NodeEditor, startIndex?: number, endIndex?: number
 export function pertCPM(editor: NodeEditor): PathResult {
     const graph = buildWeightedGraphForPERT(editor);
     const { sources, sinks } = findSourceAndSink(editor);
+    const { context } = getApplicableAlgorithms(editor);
+    const unitLabel = context?.unit?.label ?? 'Unidades';
+    const unitShortLabel = context?.unit?.shortLabel ?? '';
+    const unitDisplay = unitShortLabel || unitLabel;
+    const unitSquaredDisplay = unitDisplay ? `${unitDisplay}²` : `${unitLabel}²`;
+    const unitResult = unitShortLabel || context?.unit?.code || 'units';
+    const unitCode = context?.unit?.code ?? 'units';
+
+    const negativeDurationNodes: string[] = [];
+    graph.forEach((_, id) => {
+        const node = editor.nodes[id];
+        if (node?.type === 'task') {
+            const rawDuration = Number(node.outputs?.[0]?.value ?? 0);
+            if (rawDuration < 0) {
+                const nodeName = node.customTitle || node.type || `Node ${id}`;
+                negativeDurationNodes.push(`${nodeName} (${formatPertNumber(rawDuration, 2)})`);
+            }
+        }
+    });
+
+    if (negativeDurationNodes.length > 0) {
+        return {
+            algorithm: 'PERT/CPM',
+            success: false,
+            message: `❌ Se detectaron duraciones negativas en tareas PERT/CPM:\n${negativeDurationNodes.map(n => `  • ${n}`).join('\n')}\n\n` +
+                     `Ajusta las duraciones para que sean mayores o iguales a 0 antes de ejecutar el análisis.`,
+            details: {
+                negativeDurationNodes,
+                errorType: 'NEGATIVE_DURATIONS'
+            }
+        };
+    }
+
+    const getTaskDuration = (nodeIndex: number): number => {
+        const node = editor.nodes[nodeIndex];
+        if (!node || node.type !== 'task') return 0;
+        const durationValue = Number(node.outputs?.[0]?.value ?? 0);
+        return normalizePertValue(durationValue);
+    };
+
+    const formatWithUnit = (value: number, fractionDigits = 2): string => {
+        const formatted = formatPertNumber(value, fractionDigits);
+        return unitDisplay ? `${formatted} ${unitDisplay}` : formatted;
+    };
     
     console.log('🔍 PERT/CPM - Análisis inicial:');
     console.log('  📊 Nodos totales:', graph.size);
@@ -744,11 +814,9 @@ export function pertCPM(editor: NodeEditor): PathResult {
     
     // Inicializar nodos fuente
     sources.forEach(source => {
-        ES.set(source, 0);
-        // La duración es del NODO, no de su edge
-        const node = editor.nodes[source];
-        const duration = (node.type === 'task' && node.outputs[0]?.value) ? node.outputs[0].value : 0;
-        EF.set(source, duration);
+        setPertMetric(ES, source, 0);
+        const duration = getTaskDuration(source);
+        setPertMetric(EF, source, duration);
     });
     
     // Ordenamiento topológico y cálculo de ES/EF
@@ -764,15 +832,13 @@ export function pertCPM(editor: NodeEditor): PathResult {
         
         currentNode.edges.forEach(edge => {
             const currentEF = EF.get(current) || 0;
-            const targetES = ES.get(edge.target) || 0;
-            
-            // ES[target] = max(ES[target], EF[current])
-            if (currentEF > targetES) {
-                ES.set(edge.target, currentEF);
-                // La duración es del NODO TARGET, no del edge
-                const targetNode = editor.nodes[edge.target];
-                const targetDuration = (targetNode.type === 'task' && targetNode.outputs[0]?.value) ? targetNode.outputs[0].value : 0;
-                EF.set(edge.target, currentEF + targetDuration);
+            const targetES = ES.get(edge.target);
+            const targetDuration = getTaskDuration(edge.target);
+            const shouldUpdate = !ES.has(edge.target) || currentEF > ((targetES ?? 0) + PERT_EPSILON);
+
+            if (shouldUpdate) {
+                setPertMetric(ES, edge.target, currentEF);
+                setPertMetric(EF, edge.target, currentEF + targetDuration);
             }
             
             // Decrementar in-degree y agregar a queue si es 0
@@ -790,13 +856,13 @@ export function pertCPM(editor: NodeEditor): PathResult {
     const LF = new Map<number, number>();
     
     // Inicializar nodos sumidero
-    const maxEF = Math.max(...Array.from(EF.values()));
+    const maxEF = EF.size > 0 ? Math.max(...Array.from(EF.values())) : 0;
+    const totalTime = normalizePertValue(maxEF);
     sinks.forEach(sink => {
-        LF.set(sink, EF.get(sink) || 0);
-        // La duración es del NODO sink, no de su edge
-        const node = editor.nodes[sink];
-        const duration = (node.type === 'task' && node.outputs[0]?.value) ? node.outputs[0].value : 0;
-        LS.set(sink, (LF.get(sink) || 0) - duration);
+        const sinkEF = EF.get(sink) ?? totalTime;
+        setPertMetric(LF, sink, sinkEF);
+        const duration = getTaskDuration(sink);
+        setPertMetric(LS, sink, sinkEF - duration);
     });
     
     // Backward pass
@@ -822,15 +888,13 @@ export function pertCPM(editor: NodeEditor): PathResult {
         
         predecessors.forEach(pred => {
             const currentLS = LS.get(current) || 0;
-            const predLF = LF.get(pred) || Infinity;
+            const predLF = LF.get(pred) ?? Infinity;
+            const shouldUpdate = !LF.has(pred) || currentLS < (predLF - PERT_EPSILON);
             
-            // LF[pred] = min(LF[pred], LS[current])
-            if (currentLS < predLF) {
-                LF.set(pred, currentLS);
-                // La duración es del NODO pred, no del edge
-                const predNode = editor.nodes[pred];
-                const predDuration = (predNode.type === 'task' && predNode.outputs[0]?.value) ? predNode.outputs[0].value : 0;
-                LS.set(pred, currentLS - predDuration);
+            if (shouldUpdate) {
+                const predDuration = getTaskDuration(pred);
+                setPertMetric(LF, pred, currentLS);
+                setPertMetric(LS, pred, currentLS - predDuration);
             }
             
             if (!processedBackward.has(pred)) {
@@ -842,14 +906,22 @@ export function pertCPM(editor: NodeEditor): PathResult {
     // ⚠️ VALIDACIÓN: Detectar valores negativos que indican error en el planteamiento
     const negativeNodes: string[] = [];
     graph.forEach((_, id) => {
-        const es = ES.get(id) || 0;
-        const ef = EF.get(id) || 0;
-        const ls = LS.get(id) || 0;
-        const lf = LF.get(id) || 0;
+        const es = normalizePertValue(ES.get(id) ?? 0);
+        const ef = normalizePertValue(EF.get(id) ?? 0);
+        const ls = normalizePertValue(LS.get(id) ?? 0);
+        const lf = normalizePertValue(LF.get(id) ?? 0);
         const nodeName = editor.nodes[id]?.customTitle || editor.nodes[id]?.type || `Node ${id}`;
+
+        setPertMetric(ES, id, es);
+        setPertMetric(EF, id, ef);
+        setPertMetric(LS, id, ls);
+        setPertMetric(LF, id, lf);
         
-        if (es < 0 || ef < 0 || ls < 0 || lf < 0) {
-            negativeNodes.push(`${nodeName} (ES:${es.toFixed(2)}, EF:${ef.toFixed(2)}, LS:${ls.toFixed(2)}, LF:${lf.toFixed(2)})`);
+        if (es < -PERT_EPSILON || ef < -PERT_EPSILON || ls < -PERT_EPSILON || lf < -PERT_EPSILON) {
+            negativeNodes.push(
+                `${nodeName} (ES:${formatPertNumber(es)}, EF:${formatPertNumber(ef)}, ` +
+                `LS:${formatPertNumber(ls)}, LF:${formatPertNumber(lf)})`
+            );
         }
     });
     
@@ -881,12 +953,12 @@ export function pertCPM(editor: NodeEditor): PathResult {
     const criticalNodes: number[] = [];
     
     graph.forEach((_, id) => {
-        const es = ES.get(id) || 0;
-        const ls = LS.get(id) || 0;
-        const nodeSlack = ls - es;
+        const es = ES.get(id) ?? 0;
+        const ls = LS.get(id) ?? 0;
+        const nodeSlack = normalizePertValue(ls - es);
         slack.set(id, nodeSlack);
         
-        if (Math.abs(nodeSlack) < 0.001) { // Considerar 0 con tolerancia
+        if (Math.abs(nodeSlack) <= Math.max(0.001, PERT_EPSILON)) {
             criticalNodes.push(id);
         }
     });
@@ -944,7 +1016,6 @@ export function pertCPM(editor: NodeEditor): PathResult {
         }
     }
     
-    const totalTime = maxEF;
     const pathNames = criticalPath.map(i => editor.nodes[i]?.customTitle || editor.nodes[i]?.type || `Node ${i}`);
     
     // Convertir criticalPath a Set para verificación rápida
@@ -955,17 +1026,21 @@ export function pertCPM(editor: NodeEditor): PathResult {
         const node = editor.nodes[id];
         if (node) {
             if (!node.userData) node.userData = {};
-            const es = ES.get(id) || 0;
-            const ls = LS.get(id) || 0;
-            const nodeSlack = ls - es;
-            
+            const es = normalizePertValue(ES.get(id) ?? 0);
+            const ef = normalizePertValue(EF.get(id) ?? 0);
+            const ls = normalizePertValue(LS.get(id) ?? 0);
+            const lf = normalizePertValue(LF.get(id) ?? 0);
+            const nodeSlack = normalizePertValue(slack.get(id) ?? 0);
+
             node.userData.pertData = {
                 ES: es,
-                EF: EF.get(id) || 0,
+                EF: ef,
                 LS: ls,
-                LF: LF.get(id) || 0,
+                LF: lf,
                 slack: nodeSlack,
-                isCritical: criticalPathSet.has(id) // Solo los del camino crítico
+                isCritical: criticalPathSet.has(id),
+                unitLabel,
+                unitShortLabel
             };
         }
     });
@@ -986,25 +1061,27 @@ export function pertCPM(editor: NodeEditor): PathResult {
         }
     });
     
-    const projectStdDev = Math.sqrt(projectVariance);
+    const projectStdDevRaw = Math.sqrt(projectVariance);
+    const normalizedProjectVariance = normalizePertValue(projectVariance);
+    const projectStdDev = normalizePertValue(projectStdDevRaw);
     
     // Intervalos de confianza basados en distribución normal
     // 68% confianza: μ ± 1σ
     // 95% confianza: μ ± 2σ  
     // 99.7% confianza: μ ± 3σ
     const confidence68 = {
-        min: totalTime - projectStdDev,
-        max: totalTime + projectStdDev
+        min: normalizePertValue(totalTime - projectStdDev),
+        max: normalizePertValue(totalTime + projectStdDev)
     };
-    
+
     const confidence95 = {
-        min: totalTime - 2 * projectStdDev,
-        max: totalTime + 2 * projectStdDev
+        min: normalizePertValue(totalTime - 2 * projectStdDev),
+        max: normalizePertValue(totalTime + 2 * projectStdDev)
     };
-    
+
     const confidence997 = {
-        min: totalTime - 3 * projectStdDev,
-        max: totalTime + 3 * projectStdDev
+        min: normalizePertValue(totalTime - 3 * projectStdDev),
+        max: normalizePertValue(totalTime + 3 * projectStdDev)
     };
     
     // Crear tabla de detalles
@@ -1014,11 +1091,11 @@ export function pertCPM(editor: NodeEditor): PathResult {
         details.push({
             node: id,
             name: editorNode?.customTitle || editorNode?.type || `Node ${id}`,
-            ES: ES.get(id) || 0,
-            EF: EF.get(id) || 0,
-            LS: LS.get(id) || 0,
-            LF: LF.get(id) || 0,
-            slack: slack.get(id) || 0,
+            ES: normalizePertValue(ES.get(id) ?? 0),
+            EF: normalizePertValue(EF.get(id) ?? 0),
+            LS: normalizePertValue(LS.get(id) ?? 0),
+            LF: normalizePertValue(LF.get(id) ?? 0),
+            slack: normalizePertValue(slack.get(id) ?? 0),
             isCritical: criticalPathSet.has(id),
             // Incluir datos PERT si existen
             pertData: editorNode?.pertData ? {
@@ -1036,13 +1113,13 @@ export function pertCPM(editor: NodeEditor): PathResult {
     let varianceMessage = '';
     if (tasksWithVariance > 0) {
         varianceMessage = `\n\n📊 ANÁLISIS DE VARIANZA PERT:\n` +
-                          `  • Varianza del proyecto: ${projectVariance.toFixed(4)}\n` +
-                          `  • Desviación estándar: ${projectStdDev.toFixed(2)} unidades\n` +
+                          `  • Varianza del proyecto: ${formatPertNumber(normalizedProjectVariance, 4)} ${unitSquaredDisplay}\n` +
+                          `  • Desviación estándar: ${formatWithUnit(projectStdDev)}\n` +
                           `  • Tareas con estimaciones PERT: ${tasksWithVariance}/${criticalPath.length}\n\n` +
                           `⏱️ INTERVALOS DE CONFIANZA:\n` +
-                          `  • 68% confianza: ${confidence68.min.toFixed(1)} - ${confidence68.max.toFixed(1)} unidades\n` +
-                          `  • 95% confianza: ${confidence95.min.toFixed(1)} - ${confidence95.max.toFixed(1)} unidades\n` +
-                          `  • 99.7% confianza: ${confidence997.min.toFixed(1)} - ${confidence997.max.toFixed(1)} unidades`;
+                          `  • 68% confianza: ${formatWithUnit(confidence68.min, 1)} – ${formatWithUnit(confidence68.max, 1)}\n` +
+                          `  • 95% confianza: ${formatWithUnit(confidence95.min, 1)} – ${formatWithUnit(confidence95.max, 1)}\n` +
+                          `  • 99.7% confianza: ${formatWithUnit(confidence997.min, 1)} – ${formatWithUnit(confidence997.max, 1)}`;
     } else if (tasksWithoutVariance > 0) {
         varianceMessage = `\n\n💡 TIP: Configura estimaciones PERT (optimista/más probable/pesimista) en las tareas\n` +
                           `   para obtener análisis de varianza y probabilidades de cumplimiento.`;
@@ -1054,22 +1131,25 @@ export function pertCPM(editor: NodeEditor): PathResult {
         criticalPath,
         totalTime,
         message: `✅ Ruta Crítica encontrada:\n${pathNames.join(' → ')}\n\n` +
-                 `⏱️ Tiempo total del proyecto: ${totalTime} unidades\n` +
+                 `⏱️ Tiempo total del proyecto: ${formatWithUnit(totalTime)}\n` +
                  `🎯 Nodos críticos: ${criticalPath.length}${varianceMessage}`,
         details: {
             criticalNodes: criticalPath,
             nodeNames: pathNames,
             projectDuration: totalTime,
-            variance: projectVariance,
+            variance: normalizedProjectVariance,
             stdDev: projectStdDev,
             confidence68,
             confidence95,
             confidence997,
             tasksWithVariance,
             tasksWithoutVariance,
-            analysisTable: details
+            analysisTable: details,
+            unit: unitResult,
+            unitLabel,
+            unitShortLabel
         },
-        unit: 'unidades' // TODO: Obtener del contexto del problema
+        unit: unitResult
     };
 }
 

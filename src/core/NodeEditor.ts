@@ -4,10 +4,122 @@ import { logAudit } from '../main';
 import { NodeTypes } from './NodeTypes';
 import { ExecutionPluginManager } from './ExecutionPlugin';
 import { BuiltinPlugins } from './plugins/BuiltinPlugins';
+import { PROBLEM_CONTEXTS, type ProblemContext } from '../types/ProblemContext';
 
 export class NodeEditor {
   // Factor de conversión fundamental: 100 píxeles = 1 unidad de mundo
   private readonly PIXELS_PER_UNIT = 100;
+
+  private getCurrentProblemContext(): ProblemContext {
+    if (typeof sessionStorage !== 'undefined') {
+      const savedKey = sessionStorage.getItem('problemContext');
+      if (savedKey && PROBLEM_CONTEXTS[savedKey]) {
+        return PROBLEM_CONTEXTS[savedKey];
+      }
+    }
+    return PROBLEM_CONTEXTS.generic;
+  }
+
+  private resolveUnitInfo(node: Node): { label: string; shortLabel: string } {
+    const pertData = node.userData?.pertData;
+    const shortLabel = typeof pertData?.unitShortLabel === 'string' ? pertData.unitShortLabel : '';
+    const label = typeof pertData?.unitLabel === 'string' ? pertData.unitLabel : '';
+
+    if (shortLabel || label) {
+      return {
+        shortLabel,
+        label: label || shortLabel
+      };
+    }
+
+    const context = this.getCurrentProblemContext();
+    return {
+      shortLabel: context.unit.shortLabel,
+      label: context.unit.label
+    };
+  }
+
+  private formatMetricValue(rawValue: unknown): string {
+    if (typeof rawValue !== 'number' || !Number.isFinite(rawValue)) {
+      return '';
+    }
+
+    const normalized = Math.abs(rawValue) < 1e-9 ? 0 : Number(rawValue.toFixed(6));
+    if (normalized === 0) {
+      return '0';
+    }
+
+    const tolerance = 1e-6;
+    const delta4 = Math.abs(normalized - Number(normalized.toFixed(4)));
+    if (delta4 > tolerance) {
+      const fraction = this.tryFormatFraction(normalized, tolerance);
+      if (fraction) {
+        return fraction;
+      }
+    }
+
+    let minFractionDigits = 0;
+    let maxFractionDigits = 0;
+
+    if (normalized % 1 !== 0) {
+      minFractionDigits = 2;
+      maxFractionDigits = 2;
+
+      const delta2 = Math.abs(normalized - Number(normalized.toFixed(2)));
+      const delta3 = Math.abs(normalized - Number(normalized.toFixed(3)));
+
+      if (delta2 > tolerance) {
+        maxFractionDigits = 3;
+      }
+      if (delta3 > tolerance) {
+        maxFractionDigits = 4;
+      }
+    }
+
+    const locale = (typeof navigator !== 'undefined' && navigator.language)
+      ? navigator.language
+      : 'es-ES';
+
+    return new Intl.NumberFormat(locale, {
+      minimumFractionDigits: minFractionDigits,
+      maximumFractionDigits: maxFractionDigits
+    }).format(normalized);
+  }
+
+  private tryFormatFraction(value: number, tolerance: number): string | null {
+    const maxDenominator = 12;
+    const sign = value < 0 ? -1 : 1;
+    const absValue = Math.abs(value);
+
+    for (let denominator = 2; denominator <= maxDenominator; denominator++) {
+      const numerator = Math.round(absValue * denominator);
+      if (numerator === 0) {
+        continue;
+      }
+
+      const approximation = numerator / denominator;
+      if (Math.abs(approximation - absValue) <= tolerance) {
+        const signPrefix = sign < 0 ? '-' : '';
+
+        if (numerator % denominator === 0) {
+          return `${signPrefix}${numerator / denominator}`;
+        }
+
+        if (numerator > denominator) {
+          const whole = Math.floor(numerator / denominator);
+          const remainder = numerator % denominator;
+          if (remainder === 0) {
+            return `${signPrefix}${whole}`;
+          }
+          return `${signPrefix}${whole} ${remainder}/${denominator}`;
+        }
+
+        return `${signPrefix}${numerator}/${denominator}`;
+      }
+    }
+
+    return null;
+  }
 
   /**
    * Agrega un nodo al editor en el CENTRO de la vista actual
@@ -1215,27 +1327,40 @@ export class NodeEditor {
       } else if (node.type === 'task') {
         // Nodo TASK - mostrar duración SOLO si existe (peso opcional)
         const duration = node.outputs[0]?.value;
-        if (duration !== undefined && typeof duration === 'number' && duration > 0) {
+        const numericDuration = typeof duration === 'number' ? duration : Number(duration);
+        const unitInfo = this.resolveUnitInfo(node);
+        const unitToken = unitInfo.shortLabel || unitInfo.label || '';
+
+        if (Number.isFinite(numericDuration) && numericDuration > 0) {
           ctx.fillStyle = 'rgb(0, 188, 212)'; // Cyan
           ctx.font = "bold 0.22px 'Montserrat', 'Segoe UI', 'Roboto', Arial, sans-serif";
-          ctx.fillText(`⏱ ${duration}`, node.pos.x, node.pos.y + 0.23);
+          const durationText = this.formatMetricValue(numericDuration);
+          const durationLabel = unitToken ? `${durationText} ${unitToken}` : durationText;
+          ctx.fillText(`⏱ ${durationLabel}`, node.pos.x, node.pos.y + 0.23);
         }
         // Si no tiene duration, no muestra nada (nodo sin peso)
         
         // Mostrar ES/EF/LS/LF si están calculados
         if (node.userData?.pertData) {
           const { ES, EF, LS, LF, slack, isCritical } = node.userData.pertData;
+          const esText = this.formatMetricValue(ES);
+          const efText = this.formatMetricValue(EF);
+          const lsText = this.formatMetricValue(LS);
+          const lfText = this.formatMetricValue(LF);
+          const slackText = this.formatMetricValue(slack);
+          const unitSuffix = unitToken ? ` ${unitToken}` : '';
           ctx.font = "0.11px 'Montserrat', 'Segoe UI', 'Roboto', Arial, sans-serif";
           ctx.fillStyle = isCritical ? 'rgb(255, 50, 50)' : 'rgb(76, 175, 80)';
-          ctx.fillText(`ES:${ES} EF:${EF}`, node.pos.x, node.pos.y + 0.38);
-          ctx.fillText(`LS:${LS} LF:${LF}`, node.pos.x, node.pos.y + 0.50);
+          ctx.fillText(`ES:${esText}${unitSuffix}  EF:${efText}${unitSuffix}`, node.pos.x, node.pos.y + 0.38);
+          ctx.fillText(`LS:${lsText}${unitSuffix}  LF:${lfText}${unitSuffix}`, node.pos.x, node.pos.y + 0.50);
           if (isCritical) {
             ctx.fillStyle = 'rgb(255, 50, 50)';
             ctx.font = "bold 0.13px 'Montserrat', 'Segoe UI', 'Roboto', Arial, sans-serif";
             ctx.fillText('★ CRÍTICO', node.pos.x, node.pos.y + 0.64);
           } else {
             ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-            ctx.fillText(`Slack: ${slack}d`, node.pos.x, node.pos.y + 0.64);
+            const slackLabel = unitToken ? `${slackText}${unitSuffix}` : slackText;
+            ctx.fillText(`Slack: ${slackLabel}`, node.pos.x, node.pos.y + 0.64);
           }
         }
       } else if (node.type === 'info-panel') {
