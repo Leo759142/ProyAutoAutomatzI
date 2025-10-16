@@ -274,9 +274,13 @@ export function getApplicableAlgorithms(editor: NodeEditor, context?: ProblemCon
         
         if (!hasConnections) {
             return {
-                applicable: false,
-                reason: 'No hay conexiones entre nodos',
-                severity: 'error'
+                applicable: true,
+                reason: 'El grafo no tiene conexiones; agrega enlaces para obtener rutas significativas.',
+                severity: 'warning',
+                suggestions: [
+                    'Crea conexiones entre nodos para que Dijkstra calcule distancias útiles',
+                    'Selecciona un nodo de inicio y fin con al menos una conexión'
+                ]
             };
         }
         
@@ -350,9 +354,13 @@ export function getApplicableAlgorithms(editor: NodeEditor, context?: ProblemCon
         
         if (!hasConnections) {
             return {
-                applicable: false,
-                reason: 'No hay conexiones entre nodos',
-                severity: 'error'
+                applicable: true,
+                reason: 'No hay dependencias entre tareas; se analizarán actividades independientes.',
+                severity: 'warning',
+                suggestions: [
+                    'Conecta las tareas para definir precedencias claras',
+                    'Establece dependencias para obtener una ruta crítica completa'
+                ]
             };
         }
         

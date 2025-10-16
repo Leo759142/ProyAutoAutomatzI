@@ -284,8 +284,61 @@ export class AlgorithmValidationUI {
         }
 
         if (result) {
+            this.applyAlgorithmHighlights(result, selectedAlgorithm);
             this.showResults(result, selectedAlgorithm);
         }
+    }
+
+    private clearPathHighlights() {
+        if (!this.editor) return;
+
+        this.editor.nodes.forEach(node => {
+            if (!node.userData) return;
+
+            if (node.userData.pathHighlight) {
+                delete node.userData.pathHighlight;
+            }
+
+            if (node.userData.isInOptimalPath) {
+                delete node.userData.isInOptimalPath;
+            }
+
+            // Mantener datos PERT; limpiar userData vacío si corresponde
+            if (Object.keys(node.userData).length === 0) {
+                delete node.userData;
+            }
+        });
+    }
+
+    private applyAlgorithmHighlights(result: PathResult, algorithmType: string) {
+        if (!this.editor || !result.success) {
+            return;
+        }
+
+        this.clearPathHighlights();
+
+        const highlightKey = algorithmType === 'pertcpm' ? 'pertcpm' : algorithmType;
+        const nodesToHighlight = algorithmType === 'pertcpm'
+            ? (result.criticalPath || [])
+            : (result.path || []);
+
+        nodesToHighlight.forEach((nodeIndex, order) => {
+            const node = this.editor!.nodes[nodeIndex];
+            if (!node) {
+                return;
+            }
+
+            if (!node.userData) {
+                node.userData = {};
+            }
+
+            node.userData.pathHighlight = {
+                algorithm: highlightKey,
+                order
+            };
+
+            node.userData.isInOptimalPath = true;
+        });
     }
 
     /**

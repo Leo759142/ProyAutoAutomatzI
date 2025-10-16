@@ -1177,24 +1177,39 @@ export class NodeEditor {
       // Fondo del nodo con gradiente o color lógico para ConditionNode
       let fillStyle: CanvasGradient | string;
       let highlight = false;
-      let isOptimalPath = false;
-      
-      // Verificar si está en el camino óptimo (Dijkstra/A*/PERT)
-      if (node.userData?.pathHighlight || node.userData?.isInOptimalPath) {
-        isOptimalPath = true;
-      }
-      
+      let highlightPalette: { start: string; end: string; glow: string; stroke: string } | null = null;
+
+      const pathHighlightMeta = node.userData?.pathHighlight as { algorithm?: string } | undefined;
+      const highlightAlgorithm = pathHighlightMeta?.algorithm;
+      const hasOptimalHighlight = Boolean(pathHighlightMeta) || Boolean(node.userData?.isInOptimalPath);
+      const isPertCritical = node.userData?.pertData?.isCritical === true;
+
       // Verificar si está en ejecución paso a paso
       const stepExecuting = node.stepHighlight;
       
-      if (isOptimalPath && !stepExecuting) {
-        // HIGHLIGHTING CYAN para camino óptimo/crítico
+      if (!stepExecuting && (hasOptimalHighlight || isPertCritical)) {
+        // Escoger paleta según algoritmo
+        const usePertPalette = highlightAlgorithm === 'pertcpm' || (!highlightAlgorithm && isPertCritical);
+        highlightPalette = usePertPalette
+          ? {
+              start: 'rgb(244, 67, 54)',
+              end: 'rgb(183, 28, 28)',
+              glow: 'rgba(244, 67, 54, 0.9)',
+              stroke: 'rgb(255, 138, 128)'
+            }
+          : {
+              start: 'rgb(63, 81, 181)',
+              end: 'rgb(48, 63, 159)',
+              glow: 'rgba(63, 81, 181, 0.9)',
+              stroke: 'rgb(144, 202, 249)'
+            };
+
         const gradient = ctx.createLinearGradient(
           node.pos.x - w/2, node.pos.y - h/2,
           node.pos.x - w/2, node.pos.y + h/2
         );
-        gradient.addColorStop(0, 'rgb(0, 188, 212)'); // Cyan brillante
-        gradient.addColorStop(1, 'rgb(0, 150, 170)'); // Cyan oscuro
+        gradient.addColorStop(0, highlightPalette.start);
+        gradient.addColorStop(1, highlightPalette.end);
         fillStyle = gradient;
         highlight = true; // Activar resplandor
       } else if (node.type === 'condition') {
@@ -1229,15 +1244,15 @@ export class NodeEditor {
       if (highlight) {
         ctx.save();
         // Color del resplandor según el tipo de highlighting
-        const glowColor = isOptimalPath ? 'rgb(0, 255, 255)' : 'yellow'; // Cyan para camino óptimo
-        const strokeColor = isOptimalPath ? 'rgb(0, 255, 255)' : 'yellow';
+        const glowColor = highlightPalette ? highlightPalette.glow : 'yellow';
+        const strokeColor = highlightPalette ? highlightPalette.stroke : 'yellow';
         
         ctx.shadowColor = glowColor;
-        ctx.shadowBlur = isOptimalPath ? 0.35 : 0.25; // Más intenso para camino óptimo
+        ctx.shadowBlur = highlightPalette ? 0.35 : 0.25; // Más intenso para camino óptimo
         ctx.beginPath();
         ctx.roundRect(node.pos.x - w/2, node.pos.y - h/2, w, h, 0.1);
         ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = isOptimalPath ? 0.10 : 0.07; // Borde más grueso para camino óptimo
+        ctx.lineWidth = highlightPalette ? 0.10 : 0.07; // Borde más grueso para camino óptimo
         ctx.stroke();
         ctx.restore();
       }
